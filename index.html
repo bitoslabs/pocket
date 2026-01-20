@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="Track your Lightning zaps and manage private journal entries on Nostr"
+    />
+    <meta
+      name="theme-color"
+      content="#000000"
+      media="(prefers-color-scheme: dark)"
+    />
+    <meta
+      name="theme-color"
+      content="#f2f2f7"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
+
+    <title>Nostr Zap Journal</title>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/variables.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/components.css" />
+
+    <style>
+      /* Initial loading state */
+      .app-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        background: var(--color-bg-primary);
+      }
+
+      .app-loading-content {
+        text-align: center;
+      }
+
+      .app-loading-logo {
+        font-size: 4rem;
+        margin-bottom: 1.5rem;
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.7;
+          transform: scale(0.95);
+        }
+      }
+
+      .app-loading-text {
+        font-size: 1.125rem;
+        color: var(--color-text-secondary);
+      }
+
+      /* Hide loading when app is ready */
+      .app-ready .app-loading {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Loading State -->
+    <div class="app-loading" id="app-loading">
+      <div class="app-loading-content">
+        <div class="app-loading-logo">⚡</div>
+        <p class="app-loading-text">Loading Zap Journal...</p>
+      </div>
+    </div>
+
+    <!-- Main Application -->
+    <div class="app" id="app" style="display: none">
+      <!-- Sidebar Overlay for mobile -->
+      <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+      <!-- Sidebar -->
+      <aside class="app-sidebar" role="navigation" aria-label="Main navigation">
+        <!-- Sidebar content mounted by JS -->
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="app-main">
+        <!-- Header -->
+        <header class="app-header" role="banner">
+          <!-- Header content mounted by JS -->
+        </header>
+
+        <!-- Page Content -->
+        <div class="app-content" role="main">
+          <!-- Page content mounted by router -->
+        </div>
+      </main>
+
+      <!-- iOS Tab Bar (mobile) -->
+      <div class="app-tabbar" role="navigation" aria-label="Tab navigation">
+        <!-- Tab bar content mounted by JS -->
+      </div>
+    </div>
+
+    <!-- Crypto Dependencies -->
+    <script src="https://unpkg.com/nostr-tools@1.17.0/lib/nostr.bundle.js"></script>
+
+    <!-- App Script -->
+    <script type="module">
+      import app from "./js/app.js";
+
+      // Show app when loaded
+      window.addEventListener("load", () => {
+        document.getElementById("app-loading").style.display = "none";
+        document.getElementById("app").style.display = "flex";
+        document.body.classList.add("app-ready");
+      });
+    </script>
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/service-worker.js")
+            .then((registration) => {
+              console.log("[SW] Registered:", registration.scope);
+            })
+            .catch((error) => {
+              console.log("[SW] Registration failed:", error);
+            });
+        });
+      }
+    </script>
+  </body>
+</html>

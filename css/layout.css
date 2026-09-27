@@ -279,6 +279,30 @@ a.side-brand:active {
   height: 15px;
 }
 
+/* Expandable search (mobile/tablet): the button turns the header row into the
+   search field, so the logo and secondary actions step aside. */
+@media (max-width: 999px) {
+  .topbar.search-open .brand {
+    display: none;
+  }
+
+  .topbar.search-open .search-wrap {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-top: 0;
+  }
+
+  .topbar.search-open .search-wrap input {
+    padding-right: 14px;
+  }
+
+  .topbar.search-open .search-clear,
+  .topbar.search-open .top-actions .sync-chip,
+  .topbar.search-open .top-actions [data-action='lock'] {
+    display: none;
+  }
+}
+
 /* ==================== Sidebar (desktop) ==================== */
 
 .sidebar {
@@ -556,7 +580,7 @@ a.side-brand:active {
     align-self: start;
     height: 100vh;
     height: 100dvh;
-    padding: 22px 6px 22px 0;
+    padding: 16px 6px 22px 0;
     overflow-y: auto;
   }
 
@@ -570,6 +594,11 @@ a.side-brand:active {
     padding: 0 0 72px;
   }
 
+  /* The sidebar owns the brand on desktop; drop the duplicate in the topbar. */
+  .topbar .brand {
+    display: none;
+  }
+
   .search-toggle {
     display: none;
   }
@@ -578,7 +607,8 @@ a.side-brand:active {
     display: block;
     flex: 1 1 auto;
     max-width: 420px;
-    margin-left: auto;
+    margin-left: 0;
+    margin-right: auto;
   }
 
   .topbar {

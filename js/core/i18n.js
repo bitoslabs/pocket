@@ -26,7 +26,7 @@ import th from '../locales/th.js';
 import lo from '../locales/lo.js';
 
 export const LANG_KEY = config.storage.keys.LANG; // 'app_lang'
-export const DEFAULT_LANG = config.i18n.defaultLanguage || 'lo';
+export const DEFAULT_LANG = config.i18n.defaultLanguage || 'en';
 
 /** UI metadata for the language picker, in display order. */
 export const LANGUAGES = [
@@ -169,7 +169,12 @@ export function setLanguage(code, { persist = true } = {}) {
   return _lang;
 }
 
-/** Detect the initial language and apply it. Call once during boot. */
+/**
+ * Apply the initial language. Call once during boot.
+ *
+ * A saved choice always wins; otherwise the configured default language
+ * (`config.i18n.defaultLanguage`) is used.
+ */
 export function initI18n() {
   let saved = null;
   try {
@@ -178,13 +183,7 @@ export function initI18n() {
     /* ignore */
   }
 
-  let detected = saved;
-  if (!detected && typeof navigator !== 'undefined' && navigator.language) {
-    const nav = normalize(navigator.language);
-    if (SUPPORTED.includes(nav)) detected = nav;
-  }
-
-  _lang = normalize(detected || DEFAULT_LANG);
+  _lang = normalize(saved || DEFAULT_LANG);
   return setLanguage(_lang, { persist: !!saved });
 }
 

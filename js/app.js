@@ -64,7 +64,7 @@ class App {
             // Storage first
             await storageService.init();
 
-            // Language (defaults to Lao) + static [data-i18n] nodes
+            // Language (defaults to English) + static [data-i18n] nodes
             initI18n();
 
             // Restore saved theme + accent (dark/Light, colour picker)

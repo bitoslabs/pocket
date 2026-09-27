@@ -432,7 +432,7 @@ a.side-brand:active {
   transform: translateX(-50%);
   width: min(600px, calc(100% - 28px));
   display: grid;
-  grid-template-columns: 1fr 1fr 76px 1fr 1fr;
+  grid-template-columns: repeat(5, 1fr);
   align-items: center;
   background: var(--glass-bg);
   backdrop-filter: blur(18px);
@@ -487,6 +487,7 @@ a.side-brand:active {
 
 .fab {
   grid-column: 3;
+  justify-self: center;
   width: 58px;
   height: 58px;
   border-radius: 50%;
@@ -610,7 +611,7 @@ a.side-brand:active {
     bottom: calc(8px + var(--safe-area-bottom));
     padding: 5px 8px;
     border-radius: 18px;
-    grid-template-columns: 1fr 1fr 64px 1fr 1fr;
+    grid-template-columns: repeat(5, 1fr);
   }
   .dock-btn {
     padding: 5px 0;

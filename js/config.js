@@ -63,8 +63,8 @@ export const config = {
 
     // Internationalisation
     i18n: {
-        defaultLanguage: 'lo',
-        languages: ['lo', 'th', 'en']
+        defaultLanguage: 'en',
+        languages: ['en', 'th', 'lo']
     },
 
     // UI settings

@@ -1,5 +1,5 @@
 /**
- * Lao dictionary (default language). Mirrors the key structure of locales/en.js.
+ * Lao dictionary. Mirrors the key structure of locales/en.js.
  *
  * @module locales/lo
  */

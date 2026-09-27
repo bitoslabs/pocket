@@ -76,7 +76,6 @@ export class ProfilePage extends Component {
 
     const appLock = store.get('appLock');
     const sync = store.get('sync') || {};
-    const relaysConnected = (store.get('relays.connected') || []).length;
     const themeMode = getTheme();
     const accent = getAccent();
     const streak = this._streak(entries);
@@ -228,8 +227,8 @@ export class ProfilePage extends Component {
           const pending = sync.pending || 0;
           let label = 'All synced';
           let badge = 'badge-neutral';
-          let sub = relaysConnected
-            ? `${relaysConnected} relay${relaysConnected === 1 ? '' : 's'} connected`
+          let sub = relays.length
+            ? `${relays.length} relay${relays.length === 1 ? '' : 's'} connected`
             : 'No relays connected';
           if (!authenticated) {
             label = 'Local only';

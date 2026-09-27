@@ -44,7 +44,7 @@ export class HomePage extends Component {
 
     const now = new Date();
     const { tin, tout } = monthTotals(transactions, now.getFullYear(), now.getMonth());
-    const balance = Math.max(0, allTimeBalance(transactions));
+    const balance = allTimeBalance(transactions);
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);

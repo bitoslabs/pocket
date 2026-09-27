@@ -37,18 +37,7 @@ export class JournalPage extends Component {
 
   template() {
     const authenticated = store.get('isAuthenticated');
-
-    if (!authenticated) {
-      return `
-        <div class="view-title">Journal <span class="priv-pill">${Icons.eyeOff} private</span></div>
-        <div class="empty">
-          <div class="empty-ic">${Icons.lock}</div>
-          <h3>Connect to unlock</h3>
-          <p>Your journal is encrypted and stored on Nostr. Connect your account to read it.</p>
-          <button class="btn btn-primary" data-action="connect">Connect with Nostr</button>
-        </div>
-      `;
-    }
+    const banner = authenticated ? '' : this._guestBanner();
 
     const query = store.get('ui.query') || '';
     const all = (store.get('journal') || []).slice().sort(
@@ -62,7 +51,10 @@ export class JournalPage extends Component {
 
     if (!entries.length) {
       return `
-        <div class="view-title">Journal <span class="priv-pill">${Icons.eyeOff} private</span></div>
+        <div class="view-title">Journal <span class="priv-pill">${Icons.eyeOff} ${
+        authenticated ? 'private' : 'local'
+      }</span></div>
+        ${banner}
         <div class="empty">
           <div class="empty-ic">${Icons.book}</div>
           <h3>${query ? 'No matches' : 'Your journal starts today'}</h3>
@@ -82,7 +74,10 @@ export class JournalPage extends Component {
     const groups = groupByDay(entries, (e) => e.created_at);
 
     return `
-      <div class="view-title">Journal <span class="priv-pill">${Icons.eyeOff} private</span></div>
+      <div class="view-title">Journal <span class="priv-pill">${Icons.eyeOff} ${
+      authenticated ? 'private' : 'local'
+    }</span></div>
+      ${banner}
       ${groups
         .map(
           (g) =>
@@ -90,6 +85,18 @@ export class JournalPage extends Component {
             g.items.map((e) => this._entryCard(e, transactions)).join('')
         )
         .join('')}
+    `;
+  }
+
+  _guestBanner() {
+    return `
+      <div class="card">
+        <div class="card-head"><h3>Local mode</h3></div>
+        <p class="muted-p" style="text-align:left;padding:0 0 12px">
+          Entries are saved on this device only. Connect Nostr to encrypt them and sync across devices.
+        </p>
+        <button class="btn btn-primary btn-block" data-action="connect">Connect with Nostr</button>
+      </div>
     `;
   }
 

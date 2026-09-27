@@ -190,13 +190,9 @@ async function submit(textarea, state, modalMgr, onSaved) {
     return false;
   }
 
-  if (!authService.isAuthenticated()) {
-    modalMgr.close();
-    const { loginModal } = await import('./login-modal.js');
-    toast('Connect your Nostr account to save entries', 'warning');
-    loginModal.show();
-    return false;
-  }
+  // Guests can still write: entries are stored locally and encrypted/synced
+  // automatically after they connect.
+  const localOnly = !authService.isAuthenticated();
 
   state.saving = true;
   try {
@@ -228,7 +224,12 @@ async function submit(textarea, state, modalMgr, onSaved) {
     });
 
     modalMgr.close();
-    toast('Entry saved to your private journal 🔒', 'success');
+    toast(
+      localOnly
+        ? 'Saved on this device — connect to encrypt & sync'
+        : 'Entry saved to your private journal 🔒',
+      localOnly ? 'info' : 'success'
+    );
     onSaved?.();
   } catch (err) {
     toast(err.message || 'Could not save entry', 'error');

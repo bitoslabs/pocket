@@ -1,0 +1,10 @@
+{
+  "name": "zapjournal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Private journal and Lightning sats tracker on Nostr (pure web app)",
+  "scripts": {
+    "test": "node --test"
+  }
+}

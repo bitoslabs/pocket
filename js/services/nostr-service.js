@@ -61,7 +61,8 @@ class NostrService {
                     // Update store
                     const pending = (store.get('relays.pending') || []).filter(r => r !== url);
                     const connected = [...new Set([...(store.get('relays.connected') || []), url])];
-                    store.merge('relays', { pending, connected });
+                    const failed = (store.get('relays.failed') || []).filter(r => r !== url);
+                    store.merge('relays', { pending, connected, failed });
 
                     // Flush queued messages
                     const queue = this._messageQueue.get(url) || [];
@@ -309,16 +310,14 @@ class NostrService {
      */
     _scheduleReconnect(url) {
         const attempts = (this._reconnectAttempts.get(url) || 0) + 1;
-
-        if (attempts > config.relays.maxRetries) {
-            console.log(`[Nostr] Max reconnect attempts reached for ${url}`);
-            const failed = [...new Set([...(store.get('relays.failed') || []), url])];
-            store.merge('relays', { failed });
-            return;
-        }
-
         this._reconnectAttempts.set(url, attempts);
-        const delay = config.relays.retryDelay * Math.pow(2, attempts - 1);
+
+        // Keep retrying with capped exponential backoff so sync recovers even
+        // after a long outage (never permanently give up until the tab closes).
+        const delay = Math.min(
+            config.relays.retryDelay * Math.pow(2, attempts - 1),
+            60000
+        );
 
         console.log(`[Nostr] Reconnecting to ${url} in ${delay}ms (attempt ${attempts})`);
 
@@ -327,6 +326,36 @@ class NostrService {
                 // Error handled in connect
             });
         }, delay);
+    }
+
+    /** Relays the user has saved, falling back to the defaults. */
+    savedRelays() {
+        const saved = storageService.getLocal(config.storage.keys.RELAYS);
+        return Array.isArray(saved) && saved.length ? saved : [...config.relays.default];
+    }
+
+    _persistRelays(urls) {
+        storageService.setLocal(config.storage.keys.RELAYS, urls);
+    }
+
+    /** Add and connect a relay (persisted). Returns the normalized url. */
+    async addRelay(url) {
+        const clean = String(url || '').trim();
+        if (!/^wss?:\/\//i.test(clean)) throw new Error('Relay must start with wss://');
+        const saved = this.savedRelays();
+        if (!saved.includes(clean)) {
+            this._persistRelays([...saved, clean]);
+        }
+        await this.connect(clean).catch(() => {});
+        return clean;
+    }
+
+    /** Remove and disconnect a relay (persisted). */
+    removeRelay(url) {
+        const saved = this.savedRelays().filter((r) => r !== url);
+        this._persistRelays(saved.length ? saved : [...config.relays.default]);
+        this.disconnect(url);
+        this._reconnectAttempts.delete(url);
     }
 
     /**

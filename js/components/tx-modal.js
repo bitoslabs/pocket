@@ -67,52 +67,86 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
       </button>
     </div>
     <div class="amt-line">
-      <input id="txAmt" type="number" min="1" inputmode="numeric" placeholder="0" autocomplete="off" />
-      <span>sats</span>
+      <input id="txAmt" type="number" min="0" inputmode="decimal" placeholder="0" autocomplete="off" />
+      ${
+        fiatOn
+          ? `<button type="button" class="unit-toggle" id="txUnit" aria-label="Switch amount unit">
+               <span data-unit="sats">sats</span>
+               <span data-unit="fiat">${currency}</span>
+             </button>`
+          : `<span>sats</span>`
+      }
     </div>
-    ${
-      fiatOn
-        ? `<div class="amt-line fiat-line">
-             <input id="txFiat" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" autocomplete="off" />
-             <span>${currency}</span>
-           </div>`
-        : ''
-    }
+    ${fiatOn ? `<div class="fiat-preview" id="txFiatPreview"></div>` : ''}
     <div class="cat-chips" id="txCats"></div>
     <input id="txNote" class="note-input" style="margin-top:12px"
       placeholder="Note (optional) — e.g. Ramen with the crew" maxlength="80" autocomplete="off" />
   `;
 
-  const satsInput = content.querySelector('#txAmt');
-  const fiatInput = content.querySelector('#txFiat');
+  const amtInput = content.querySelector('#txAmt');
+  const unitToggle = content.querySelector('#txUnit');
+  let unit = 'sats'; // which unit the amount input is entered in
 
   if (tx) {
     state.dir = TYPE_TO_DIR[tx.type] || 'out';
     state.cat = tx.category || null;
-    satsInput.value = tx.amount || '';
+    amtInput.value = tx.amount || '';
     content.querySelector('#txNote').value = tx.description || '';
-    if (fiatInput && tx.fiatAmount !== undefined && tx.fiatAmount !== null) {
-      fiatInput.value = tx.fiatAmount;
-    }
   }
 
-  // Two-way sats ⇄ fiat binding
-  if (fiatOn && fiatInput) {
-    const syncFromSats = () => {
-      const sats = parseFloat(satsInput.value);
-      fiatInput.value = Number.isFinite(sats) && sats > 0
-        ? priceService.satsToFiat(sats).toFixed(2)
-        : '';
-    };
-    const syncFromFiat = () => {
-      const f = parseFloat(fiatInput.value);
-      satsInput.value = Number.isFinite(f) && f > 0 ? priceService.fiatToSats(f) : '';
-    };
-    satsInput.addEventListener('input', syncFromSats);
-    fiatInput.addEventListener('input', syncFromFiat);
-    if (tx && (tx.fiatAmount === undefined || tx.fiatAmount === null) && satsInput.value) {
-      syncFromSats();
+  // Live "sats ~ fiat" preview (e.g. "100 sats ~ ₭500")
+  const fiatPreview = content.querySelector('#txFiatPreview');
+
+  const amountToSats = () => {
+    const v = parseFloat(amtInput.value);
+    if (!(v > 0)) return 0;
+    return unit === 'fiat' ? priceService.fiatToSats(v) : Math.round(v);
+  };
+
+  const renderFiatPreview = () => {
+    if (!fiatPreview) return;
+    const v = parseFloat(amtInput.value);
+    if (!(v > 0)) {
+      fiatPreview.textContent = '';
+      return;
     }
+    const sats = unit === 'fiat' ? priceService.fiatToSats(v) : Math.round(v);
+    const fiat = unit === 'fiat' ? v : priceService.satsToFiat(v);
+    fiatPreview.textContent =
+      sats > 0 && fiat > 0
+        ? `${fmtSats(sats)} sats ~ ${priceService.formatAmount(fiat, currency)}`
+        : '';
+  };
+
+  const refreshUnit = () => {
+    if (unitToggle) {
+      unitToggle.querySelectorAll('span').forEach((s) => {
+        s.classList.toggle('on', s.dataset.unit === unit);
+      });
+    }
+    renderFiatPreview();
+  };
+
+  const setUnit = (next) => {
+    if (!fiatOn || next === unit) return;
+    const v = parseFloat(amtInput.value);
+    if (v > 0) {
+      amtInput.value =
+        next === 'fiat'
+          ? priceService.satsToFiat(v).toFixed(2)
+          : priceService.fiatToSats(v);
+    }
+    unit = next;
+    refreshUnit();
+  };
+
+  if (fiatOn) {
+    amtInput.addEventListener('input', renderFiatPreview);
+    unitToggle?.addEventListener('click', (e) => {
+      const span = e.target.closest('span[data-unit]');
+      setUnit(span ? span.dataset.unit : unit === 'sats' ? 'fiat' : 'sats');
+    });
+    refreshUnit();
   }
 
   const refreshSeg = () => {
@@ -158,7 +192,7 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
     variant: 'btn-primary',
     closeOnClick: false,
     handler: async () => {
-      const amt = parseInt(satsInput.value, 10);
+      const amt = amountToSats();
       if (!amt || amt < 1) {
         toast('Enter an amount first', 'error');
         return false;
@@ -169,8 +203,8 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
       // Snapshot the fiat value at the time of entry (when shown)
       let fiatAmount;
       if (fiatOn) {
-        const f = fiatInput ? parseFloat(fiatInput.value) : NaN;
-        fiatAmount = Number.isFinite(f) && f > 0 ? f : priceService.satsToFiat(amt);
+        const v = parseFloat(amtInput.value);
+        fiatAmount = unit === 'fiat' && v > 0 ? v : priceService.satsToFiat(amt);
       }
 
       const payload = { type, category: state.cat, amount: amt, description: note };
@@ -211,7 +245,7 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
     actions,
   });
 
-  setTimeout(() => satsInput?.focus(), 320);
+  setTimeout(() => amtInput?.focus(), 320);
 }
 
 export default openTxModal;

@@ -85,9 +85,12 @@ export class HomePage extends Component {
       <div class="balance">
         <div class="bal-label">Satoshi balance</div>
         <div class="bal-num">${fmtFull(balance)}<small>sats</small></div>
-        <div class="bal-btc">
-          ${fiatLabel(balance) ? `<span class="bal-fiat">${fiatLabel(balance)}</span> · ` : ''}${toBTC(balance)}
-        </div>
+        ${
+          fiatLabel(balance)
+            ? `<div class="bal-conv">${fmtFull(balance)} sats ~ ${fiatLabel(balance)}</div>`
+            : ''
+        }
+        <div class="bal-btc">${toBTC(balance)}</div>
         <div class="bal-row">
           <div class="bal-cell in">
             <span class="ic">${Icons.downLeft}</span>

@@ -30,7 +30,7 @@
   align-items: center;
   gap: 8px 10px;
   padding: 14px 0 10px;
-  background: linear-gradient(180deg, rgba(11, 9, 18, 0.95), rgba(11, 9, 18, 0.78));
+  background: var(--topbar-bg);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
@@ -49,8 +49,8 @@
   display: grid;
   place-items: center;
   color: #fff;
-  background: linear-gradient(135deg, var(--accent), #6d28d9);
-  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.4);
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  box-shadow: 0 4px 14px var(--accent-soft);
 }
 
 .brand-mark.ic svg {
@@ -174,9 +174,9 @@
   cursor: pointer;
   font-weight: 700;
   font-size: 14.5px;
-  background: linear-gradient(135deg, var(--accent), #6d28d9);
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
   color: #fff;
-  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.35);
+  box-shadow: 0 8px 24px var(--accent-soft);
 }
 
 .side-compose .ic svg {
@@ -305,12 +305,11 @@
 @keyframes fabGlow {
   0%,
   100% {
-    box-shadow: 0 10px 28px rgba(139, 92, 246, 0.45),
+    box-shadow: 0 10px 28px var(--accent-soft),
       inset 0 1px 0 rgba(255, 255, 255, 0.25);
   }
   50% {
-    box-shadow: 0 10px 34px rgba(139, 92, 246, 0.68),
-      inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    box-shadow: 0 10px 34px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   }
 }
 
@@ -322,7 +321,7 @@
   border: none;
   cursor: pointer;
   color: #fff;
-  background: linear-gradient(135deg, var(--accent), #6d28d9);
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
   display: grid;
   place-items: center;
   transform: translateY(-16px);

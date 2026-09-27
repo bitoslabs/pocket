@@ -161,6 +161,7 @@ const initialState = {
     isLoading: false,
     error: null,
     theme: 'dark',
+    accent: '#8B5CF6',
     appLock: false,
 
     // Data

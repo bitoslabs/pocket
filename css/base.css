@@ -52,8 +52,8 @@ body.lock {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(700px 420px at 15% -5%, rgba(139, 92, 246, 0.16), transparent 60%),
-    radial-gradient(600px 400px at 92% 8%, rgba(255, 194, 75, 0.06), transparent 60%),
+    radial-gradient(700px 420px at 15% -5%, var(--wash), transparent 60%),
+    radial-gradient(600px 400px at 92% 8%, var(--zap-soft), transparent 60%),
     var(--bg);
 }
 
@@ -270,7 +270,7 @@ button svg {
 /* ==================== Selection & Focus ==================== */
 
 ::selection {
-  background: rgba(139, 92, 246, 0.4);
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 :focus {

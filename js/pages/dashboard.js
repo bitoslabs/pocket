@@ -87,11 +87,11 @@ export class HomePage extends Component {
         <div class="bal-row">
           <div class="bal-cell in">
             <span class="ic">${Icons.downLeft}</span>
-            <div><div class="bc-t">In · this month</div><div class="bc-v">${fmtSats(tin)}</div></div>
+            <div><div class="bc-t">In · month</div><div class="bc-v">${fmtSats(tin)}</div></div>
           </div>
           <div class="bal-cell">
             <span class="ic">${Icons.upRight}</span>
-            <div><div class="bc-t">Out · this month</div><div class="bc-v">${fmtSats(tout)}</div></div>
+            <div><div class="bc-t">Out · month</div><div class="bc-v">${fmtSats(tout)}</div></div>
           </div>
         </div>
       </div>

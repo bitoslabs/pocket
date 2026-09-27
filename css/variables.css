@@ -19,10 +19,12 @@
 
   --accent: #8b5cf6;
   --accent-2: #a78bfa;
+  --accent-deep: #6d28d9;
   --accent-soft: rgba(139, 92, 246, 0.14);
 
   --zap: #ffc24b;
   --zap-soft: rgba(255, 194, 75, 0.13);
+  --wash: color-mix(in srgb, var(--accent) 16%, transparent);
 
   --in: #4ade80;
   --in-soft: rgba(74, 222, 128, 0.12);
@@ -144,12 +146,24 @@
   --glass-blur: blur(18px);
   --glass-saturate: saturate(160%);
 
+  /* Translucent panels (theme aware) */
+  --overlay: rgba(11, 9, 18, 0.38);
+  /* Overlay used on the always-coloured balance hero (theme independent) */
+  --hero-overlay: rgba(11, 9, 18, 0.42);
+  --topbar-bg: linear-gradient(180deg, rgba(11, 9, 18, 0.95), rgba(11, 9, 18, 0.78));
+  --modal-backdrop: rgba(5, 3, 10, 0.65);
+
   /* ==================== Gradients ==================== */
-  --gradient-primary: linear-gradient(135deg, var(--accent), #6d28d9);
-  --gradient-header: linear-gradient(135deg, #3b2a6b 0%, #6d28d9 55%, #8b5cf6 100%);
+  --gradient-primary: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  --gradient-header: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-deep) 70%, #000) 0%,
+    var(--accent-deep) 55%,
+    var(--accent) 100%
+  );
   --gradient-card: linear-gradient(
     135deg,
-    rgba(139, 92, 246, 0.1) 0%,
+    var(--accent-soft) 0%,
     rgba(109, 40, 217, 0.04) 100%
   );
 
@@ -166,7 +180,7 @@
   /* ==================== Legacy semantic aliases ==================== */
   --color-primary: var(--accent);
   --color-primary-light: var(--accent-2);
-  --color-primary-dark: #6d28d9;
+  --color-primary-dark: var(--accent-deep);
   --color-primary-alpha-10: rgba(139, 92, 246, 0.1);
   --color-primary-alpha-20: rgba(139, 92, 246, 0.2);
   --color-primary-alpha-50: rgba(139, 92, 246, 0.5);
@@ -198,4 +212,42 @@
   --color-tint: var(--accent);
 
   color-scheme: dark;
+}
+
+/* ==================== Light Theme ==================== */
+[data-theme="light"] {
+  --bg: #f5f3fb;
+  --surface: #ffffff;
+  --surface-2: #f1ecfa;
+  --surface-3: #e6ddf5;
+  --border: #d9d0ec;
+  --border-soft: #e8e1f5;
+
+  --text: #1b1630;
+  --text-2: #4b4265;
+  --muted: #857c9e;
+
+  --zap-soft: rgba(245, 158, 11, 0.16);
+  --in-soft: rgba(34, 197, 94, 0.14);
+  --out-soft: rgba(239, 68, 68, 0.12);
+  --wash: color-mix(in srgb, var(--accent) 9%, transparent);
+
+  --glass-bg: rgba(255, 255, 255, 0.82);
+  --glass-bg-thick: rgba(255, 255, 255, 0.95);
+  --overlay: rgba(255, 255, 255, 0.6);
+  --topbar-bg: linear-gradient(180deg, rgba(245, 243, 251, 0.95), rgba(245, 243, 251, 0.78));
+  --modal-backdrop: rgba(40, 32, 60, 0.4);
+
+  --shadow-sm: 0 1px 2px rgba(30, 20, 60, 0.08);
+  --shadow-md: 0 6px 20px rgba(30, 20, 60, 0.1);
+  --shadow-lg: 0 14px 44px rgba(30, 20, 60, 0.16);
+  --shadow-modal: 0 -12px 60px rgba(30, 20, 60, 0.2);
+
+  /* Semantic aliases re-evaluate against the light tokens above */
+  --color-surface-light: var(--surface-2);
+  --color-surface-heavy: var(--surface-3);
+  --color-text-disabled: var(--muted);
+  --color-border-light: var(--border-soft);
+
+  color-scheme: light;
 }

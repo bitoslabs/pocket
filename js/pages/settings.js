@@ -13,12 +13,18 @@ import { nostrService } from '../services/nostr-service.js';
 import { storageService } from '../services/storage-service.js';
 import { modal } from '../components/modal.js';
 import { lock } from '../components/lock.js';
+import {
+  ACCENT_PRESETS,
+  getAccent,
+  getTheme,
+  setAccent,
+  setTheme,
+} from '../core/theme.js';
 import { Icons, hydrateIcons } from '../utils/icons.js';
 import {
   categoryMeta,
   copyText,
   fmtSats,
-  hueOf,
   isIncome,
   shortNpub,
   toast,
@@ -65,9 +71,10 @@ export class ProfilePage extends Component {
     });
     const topCat = Object.entries(spentAll).sort((a, b) => b[1] - a[1])[0];
 
-    const h = hueOf(npub || name);
-    const streak = this._streak(entries);
     const appLock = store.get('appLock');
+    const themeMode = getTheme();
+    const accent = getAccent();
+    const streak = this._streak(entries);
     const relays = store.get('relays')?.connected || [];
     const savedRelays = storageService.getLocal(config.storage.keys.RELAYS) || config.relays.default;
 
@@ -75,9 +82,9 @@ export class ProfilePage extends Component {
       <div class="view-title">Profile</div>
 
       <div class="card" style="padding-bottom:14px">
-        <div class="banner" style="background:linear-gradient(120deg,hsl(${h},60%,45%),hsl(${(h + 80) % 360},65%,35%))"></div>
+        <div class="banner"></div>
         <div class="prof-row">
-          <div class="avatar" style="background:linear-gradient(135deg,hsl(${h},65%,58%),hsl(${(h + 70) % 360},70%,48%))">
+          <div class="avatar" style="background:linear-gradient(135deg,var(--accent),var(--accent-deep))">
             ${(name[0] || '?').toUpperCase()}
           </div>
         </div>
@@ -105,6 +112,36 @@ export class ProfilePage extends Component {
                }</b> · ${fmtSats(topCat[1])} sats</p></div>`
           : ''
       }
+
+      <div class="card">
+        <div class="card-head"><h3>Appearance</h3></div>
+        <div class="seg" style="margin-bottom:14px">
+          <button type="button" data-action="set-theme" data-theme="dark"
+            class="${themeMode === 'dark' ? 'on' : ''}">
+            <span class="ic">${Icons.Moon}</span>Dark
+          </button>
+          <button type="button" data-action="set-theme" data-theme="light"
+            class="${themeMode === 'light' ? 'on' : ''}">
+            <span class="ic">${Icons.Sun}</span>Light
+          </button>
+        </div>
+        <div class="bud-top" style="margin-bottom:6px">
+          <span>Accent color</span>
+          <b style="color:${accent}">${accent}</b>
+        </div>
+        <div class="swatches">
+          ${ACCENT_PRESETS.map(
+            (a) =>
+              `<button type="button" class="swatch ${accent === a.hex ? 'on' : ''}"
+                 style="background:${a.hex}" data-action="set-accent" data-accent="${a.hex}"
+                 title="${a.name}" aria-label="${a.name}"></button>`
+          ).join('')}
+        </div>
+        <div class="color-field">
+          <input type="color" id="accentPicker" value="${accent.toLowerCase()}" aria-label="Custom accent color" />
+          <code>Custom</code>
+        </div>
+      </div>
 
       <div class="card" style="padding:6px 16px">
         ${
@@ -206,6 +243,12 @@ export class ProfilePage extends Component {
       if (action === 'connect') {
         const { loginModal } = await import('../components/login-modal.js');
         loginModal.show();
+      } else if (action === 'set-theme') {
+        setTheme(el.dataset.theme);
+        this.render();
+      } else if (action === 'set-accent') {
+        setAccent(el.dataset.accent);
+        this.render();
       } else if (action === 'logout') {
         authService.logout();
         toast('Disconnected', 'info');
@@ -262,6 +305,21 @@ export class ProfilePage extends Component {
         }
         location.reload();
       }
+    });
+
+    // Live accent preview from the native colour picker (no full re-render)
+    this.container.addEventListener('input', (e) => {
+      if (!e.target || e.target.id !== 'accentPicker') return;
+      setAccent(e.target.value);
+      const accent = getAccent();
+      const label = this.container.querySelector('.bud-top b');
+      if (label) {
+        label.textContent = accent;
+        label.style.color = accent;
+      }
+      this.container
+        .querySelectorAll('.swatch')
+        .forEach((s) => s.classList.toggle('on', s.dataset.accent === accent));
     });
   }
 

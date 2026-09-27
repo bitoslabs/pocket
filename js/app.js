@@ -8,6 +8,7 @@
 import { config } from './config.js';
 import { eventBus, Events } from './core/event-bus.js';
 import { store } from './core/state.js';
+import { initTheme } from './core/theme.js';
 import { router } from './router.js';
 
 // Services
@@ -58,11 +59,13 @@ class App {
             // Storage first
             await storageService.init();
 
-            // Design is dark-only
-            document.documentElement.setAttribute('data-theme', 'dark');
+            // Restore saved theme + accent (dark/Light, colour picker)
+            initTheme();
 
             await authService.init();
-            await nostrService.init();
+
+            // Connect relays in the background — never block first paint on the network
+            nostrService.init().catch((e) => console.warn('[App] Relay init failed:', e));
 
             this._setupEventListeners();
             this._mountLayout();

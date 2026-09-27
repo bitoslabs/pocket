@@ -87,9 +87,9 @@
   border-radius: 20px;
   padding: 20px 20px 18px;
   margin-bottom: 14px;
-  background: linear-gradient(135deg, #3b2a6b 0%, #6d28d9 55%, #8b5cf6 100%);
+  background: var(--gradient-header);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 18px 50px rgba(109, 40, 217, 0.35);
+  box-shadow: 0 18px 50px var(--accent-soft);
 }
 .balance::after {
   content: "";
@@ -139,23 +139,30 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  background: rgba(11, 9, 18, 0.38);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--hero-overlay);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 13px;
   padding: 10px 12px;
   min-width: 0;
 }
+.bal-cell > div {
+  min-width: 0;
+}
 .bal-cell .ic {
   color: var(--zap);
+  flex: none;
 }
 .bal-cell.in .ic {
   color: var(--in);
 }
 .bal-cell .bc-t {
-  font-size: 10.5px;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.68);
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .bal-cell .bc-v {
   font-family: var(--mono);
@@ -698,6 +705,7 @@
   height: 80px;
   border-radius: 17px 17px 0 0;
   margin: -16px -16px 0;
+  background: var(--gradient-header);
 }
 .prof-row {
   display: flex;
@@ -933,10 +941,10 @@
   transform: scale(0.96);
 }
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), #7c3aed);
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
   color: #fff;
   border: none;
-  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.35);
+  box-shadow: 0 6px 20px var(--accent-soft);
 }
 .btn-ghost {
   background: transparent;
@@ -1103,6 +1111,57 @@
   color: #fff;
 }
 
+/* Neutral "on" state for the money seg reused as a mode switch */
+.seg button.on {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Accent colour picker */
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 0 4px;
+}
+.swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  flex: none;
+  padding: 0;
+  box-shadow: 0 0 0 1px var(--border-soft);
+  transition: transform 0.12s;
+}
+.swatch:active {
+  transform: scale(0.9);
+}
+.swatch.on {
+  border-color: var(--text);
+}
+.color-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.color-field input[type="color"] {
+  width: 46px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+.color-field code {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* ==================== Modal — mobile sheet / desktop dialog ==================== */
 
 .modal-overlay {
@@ -1124,7 +1183,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(5, 3, 10, 0.65);
+  background: var(--modal-backdrop);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -1947,7 +2006,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: radial-gradient(600px 400px at 50% 20%, rgba(139, 92, 246, 0.18), transparent 65%),
+  background: radial-gradient(600px 400px at 50% 20%, var(--wash), transparent 65%),
     var(--bg);
 }
 .lock-brand {
@@ -1964,8 +2023,8 @@
   display: grid;
   place-items: center;
   color: #fff;
-  background: linear-gradient(135deg, var(--accent), #6d28d9);
-  box-shadow: 0 12px 40px rgba(139, 92, 246, 0.5);
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  box-shadow: 0 12px 40px var(--accent-soft);
 }
 .lock-mark svg {
   width: 26px;
@@ -2180,7 +2239,7 @@
     text-decoration: underline;
   }
   .tag:hover {
-    background: rgba(139, 92, 246, 0.25);
+    background: color-mix(in srgb, var(--accent) 25%, transparent);
   }
   .act:hover {
     background: var(--surface-2);

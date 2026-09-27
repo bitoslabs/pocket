@@ -10,7 +10,7 @@
       name="description"
       content="ZapJournal — a private journal and Lightning sats tracker on Nostr"
     />
-    <meta name="theme-color" content="#0B0912" />
+    <meta name="theme-color" content="#0B0912" id="themeColorMeta" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta
@@ -37,6 +37,19 @@
     <link rel="stylesheet" href="css/base.css" />
     <link rel="stylesheet" href="css/layout.css" />
     <link rel="stylesheet" href="css/components.css" />
+
+    <!-- Apply saved theme before first paint (avoids a flash) -->
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("app_theme");
+          var t = raw ? raw.replace(/"/g, "") : null;
+          if (t === "light" || t === "dark") {
+            document.documentElement.setAttribute("data-theme", t);
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div class="bg"></div>

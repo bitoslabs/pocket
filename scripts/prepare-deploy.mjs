@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 
 const root = new URL('../', import.meta.url);
@@ -34,5 +34,13 @@ const worker = readFileSync(workerPath, 'utf8');
 if (!worker.includes('zap-journal-__DEPLOY_HASH__')) {
   throw new Error('Service worker deploy hash placeholder is missing');
 }
-writeFileSync(workerPath, worker.replace('zap-journal-__DEPLOY_HASH__', `zap-journal-${release}`));
+const indexPath = join(destination, 'index.html');
+const index = readFileSync(indexPath, 'utf8');
+if (!index.includes('service-worker.__DEPLOY_HASH__.js')) {
+  throw new Error('Service worker filename placeholder is missing from index.html');
+}
+
+writeFileSync(workerPath, worker.replaceAll('__DEPLOY_HASH__', release));
+renameSync(workerPath, join(destination, `service-worker.${release}.js`));
+writeFileSync(indexPath, index.replace('__DEPLOY_HASH__', release));
 console.log(`Prepared release ${release}`);

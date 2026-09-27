@@ -28,12 +28,12 @@ if (configRoot && notesRoot && configRoot !== notesRoot) {
 }
 
 if (WANT_LIST) {
-  console.log('index.html manifest.json service-worker.js assets/ css/ js/');
+  console.log('index.html manifest.json service-worker.*.js assets/ css/ js/');
 } else {
   console.log('deploy check — pocket.bitos.space');
   console.log(`  source   ${tree.jsFiles.length} JS · ${tree.edges} imports`);
   console.log(`  output   ${build.files.length} files · ${(build.bytes / 1024).toFixed(0)} KiB raw · ${(build.gzipBytes / 1024).toFixed(0)} KiB gzip`);
-  console.log('  upload   index.html manifest.json service-worker.js assets/ css/ js/');
+  console.log('  upload   index.html manifest.json service-worker.*.js assets/ css/ js/');
   console.log(`  server   ${configRoot || '(missing nginx root)'}`);
 }
 if (problems.length) {

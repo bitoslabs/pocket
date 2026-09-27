@@ -5,6 +5,7 @@
 
 // The deployment script replaces this token with a hash of the published files.
 const CACHE_NAME = 'zap-journal-__DEPLOY_HASH__';
+const RELEASE_ID = '__DEPLOY_HASH__';
 const STATIC_ASSETS = [
     './',
     'index.html',
@@ -73,8 +74,17 @@ self.addEventListener('install', (event) => {
         caches.open(CACHE_NAME)
             .then((cache) => {
                 console.log('[SW] Caching static assets');
-                // Bypass the HTTP cache so a new worker stores the new release.
-                return cache.addAll(STATIC_ASSETS.map((asset) => new Request(asset, { cache: 'reload' })));
+                // Request a release-specific URL from the CDN, then cache its
+                // response under the normal URL used by the app. This prevents
+                // an edge cache from supplying an older file after a deploy.
+                return Promise.all(STATIC_ASSETS.map(async (asset) => {
+                    const request = new Request(asset);
+                    const url = new URL(asset, self.location.href);
+                    url.searchParams.set('release', RELEASE_ID);
+                    const response = await fetch(url, { cache: 'reload' });
+                    if (!response.ok) throw new Error(`Could not precache ${asset}: ${response.status}`);
+                    await cache.put(request, response);
+                }));
             })
             .then(() => {
                 console.log('[SW] Install complete');

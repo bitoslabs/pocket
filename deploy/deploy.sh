@@ -35,7 +35,7 @@ STAGE_DIR="$(mktemp -d)"
 trap 'rm -rf "$STAGE_DIR" "$LOCAL_ZIP"' EXIT
 
 # files/folders that make up the deployed site
-DEPLOY_PATHS=(index.html manifest.json service-worker.js assets css js)
+DEPLOY_PATHS=(index.html manifest.json assets css js)
 
 log() { printf '\033[1;36m==>\033[0m %s\n' "$1"; }
 
@@ -46,7 +46,7 @@ npm run build:check
 npm run deploy:check
 log "Packing $ZIP_NAME from the site root"
 node scripts/prepare-deploy.mjs "$STAGE_DIR"
-(cd "$STAGE_DIR" && zip -rq "$LOCAL_ZIP" "${DEPLOY_PATHS[@]}" -x '*.DS_Store')
+(cd "$STAGE_DIR" && zip -rq "$LOCAL_ZIP" "${DEPLOY_PATHS[@]}" service-worker.*.js -x '*.DS_Store')
 
 log "Uploading to $REMOTE_USER@$REMOTE_HOST:$REMOTE_TMP_ZIP"
 scp -P "$REMOTE_PORT" "$LOCAL_ZIP" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_TMP_ZIP"
@@ -77,8 +77,7 @@ cp -R "\$REMOTE_STAGE/assets/." "\$REMOTE_DIR/assets/"
 cp -R "\$REMOTE_STAGE/css/." "\$REMOTE_DIR/css/"
 cp -R "\$REMOTE_STAGE/js/." "\$REMOTE_DIR/js/"
 cp "\$REMOTE_STAGE/manifest.json" "\$REMOTE_STAGE/index.html" "\$REMOTE_DIR/"
-cp "\$REMOTE_STAGE/service-worker.js" "\$REMOTE_DIR/.service-worker.js.new"
-mv -f "\$REMOTE_DIR/.service-worker.js.new" "\$REMOTE_DIR/service-worker.js"
+cp "\$REMOTE_STAGE"/service-worker.*.js "\$REMOTE_DIR/"
 
 chown -R www-data:www-data "\$REMOTE_DIR" 2>/dev/null || true
 find "\$REMOTE_DIR" -type d -exec chmod 755 {} \;

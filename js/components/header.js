@@ -84,10 +84,8 @@ export class Header extends Component {
       </div>
       <div class="top-actions">
         ${this._syncChip()}
-        <button class="icon-btn search-toggle" id="searchToggle" aria-label="${t(
-          'header.search'
-        )}" aria-expanded="${this._searchOpen ? 'true' : 'false'}">
-          <span class="ic">${Icons.search}</span>
+        <button class="icon-btn search-toggle" id="searchToggle" aria-label="${this._searchOpen ? t('common.close') : t('header.search')}" aria-expanded="${this._searchOpen ? 'true' : 'false'}">
+          <span class="ic">${this._searchOpen ? Icons.x : Icons.search}</span>
         </button>
         ${
           appLock
@@ -124,7 +122,12 @@ export class Header extends Component {
     const input = this.$('#searchInput');
     const toggle = this.$('#searchToggle');
     if (wrap) wrap.classList.toggle('open', open);
-    if (toggle) toggle.setAttribute('aria-expanded', String(open));
+    if (this.container) this.container.classList.toggle('search-open', open);
+    if (toggle) {
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.setAttribute('aria-label', open ? t('common.close') : t('header.search'));
+      toggle.innerHTML = `<span class="ic">${open ? Icons.x : Icons.search}</span>`;
+    }
     if (open) {
       setTimeout(() => input && input.focus(), 60);
     } else if (input) {

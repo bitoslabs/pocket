@@ -18,6 +18,8 @@ const SEARCH_ROUTES = new Set(['journal', 'money']);
 export class Header extends Component {
   mounted() {
     this._searchOpen = false;
+    this._desktopMedia = window.matchMedia('(min-width: 1000px)');
+    this.addEventListener(this._desktopMedia, 'change', () => this.render());
     this.watchStore('appLock', () => this.render());
     this.watchStore('sync', () => {
       const chip = this._syncChip();
@@ -66,11 +68,14 @@ export class Header extends Component {
   template() {
     const appLock = store.get('appLock');
     const query = store.get('ui.query') || '';
+    const topBrand = this._desktopMedia?.matches
+      ? ''
+      : `<a class="brand" href="#home" aria-label="ZapJournal">
+           <span class="brand-mark"><img src="assets/icons/logo-mark.svg" alt="" /></span>
+           <span class="brand-name">Zap<em>Journal</em></span>
+         </a>`;
     return `
-      <a class="brand" href="#home" aria-label="ZapJournal">
-        <span class="brand-mark"><img src="assets/icons/logo-mark.svg" alt="" /></span>
-        <span class="brand-name">Zap<em>Journal</em></span>
-      </a>
+      ${topBrand}
       <div class="search-wrap ${this._searchOpen ? 'open' : ''}" id="searchWrap" role="search">
         <span class="ic">${Icons.search}</span>
         <input id="searchInput" type="search" placeholder="${t('header.searchPlaceholder')}"

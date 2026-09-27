@@ -120,7 +120,7 @@ export class ProfilePage extends Component {
     const relays = store.get('relays')?.connected || [];
     const price = store.get('price') || {
       currency: 'LAK',
-      showFiat: false,
+      showFiat: true,
       rateSource: 'auto',
       rate: 0,
       ageLabel: '',

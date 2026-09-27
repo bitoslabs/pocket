@@ -84,7 +84,7 @@ class PriceService {
     /** Per-currency cache: { USD: { rate, ts }, THB: { rate, ts } }. */
     this.rates = {};
     this.currency = DEFAULT_CURRENCY;
-    this.showFiat = false;
+    this.showFiat = true;
     this.rateSource = 'auto'; // 'auto' | 'manual'
     this.manualRate = 0;
     this.loading = false;
@@ -102,7 +102,7 @@ class PriceService {
     const cache = storageService.getLocal(RATE_KEY, null);
     if (cache && typeof cache === 'object') this.rates = cache.rates || {};
     this.currency = storageService.getLocal(CUR_KEY, DEFAULT_CURRENCY) || DEFAULT_CURRENCY;
-    this.showFiat = !!storageService.getLocal(SHOW_KEY, false);
+    this.showFiat = !!storageService.getLocal(SHOW_KEY, true);
     this.rateSource = storageService.getLocal(SRC_KEY, 'auto') || 'auto';
     this.manualRate = Number(storageService.getLocal(MANUAL_KEY, 0)) || 0;
 

@@ -7,6 +7,9 @@
   "scripts": {
     "check": "node scripts/check-precache.mjs",
     "test": "node scripts/check-precache.mjs && node --test",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "build:check": "node scripts/check-build.mjs",
+    "deploy:check": "node deploy/check.mjs",
+    "deploy:list": "node deploy/check.mjs --list"
   }
 }

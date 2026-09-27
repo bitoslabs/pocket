@@ -15,6 +15,7 @@ import {
   allTimeBalance,
   categoryMeta,
   escapeHtml,
+  fiatLabel,
   fmtSats,
   fmtFull,
   greeting,
@@ -32,6 +33,7 @@ export class HomePage extends Component {
     this.watchStore('transactions', () => this.render());
     this.watchStore('journal', () => this.render());
     this.watchStore('isAuthenticated', () => this.render());
+    this.watchStore('price', () => this.render());
   }
 
   template() {
@@ -83,15 +85,25 @@ export class HomePage extends Component {
       <div class="balance">
         <div class="bal-label">Satoshi balance</div>
         <div class="bal-num">${fmtFull(balance)}<small>sats</small></div>
-        <div class="bal-btc">${toBTC(balance)}</div>
+        <div class="bal-btc">
+          ${fiatLabel(balance) ? `<span class="bal-fiat">${fiatLabel(balance)}</span> · ` : ''}${toBTC(balance)}
+        </div>
         <div class="bal-row">
           <div class="bal-cell in">
             <span class="ic">${Icons.downLeft}</span>
-            <div><div class="bc-t">In · month</div><div class="bc-v">${fmtSats(tin)}</div></div>
+            <div>
+              <div class="bc-t">In · month</div>
+              <div class="bc-v">${fmtSats(tin)}</div>
+              ${fiatLabel(tin) ? `<div class="bc-f">${fiatLabel(tin)}</div>` : ''}
+            </div>
           </div>
           <div class="bal-cell">
             <span class="ic">${Icons.upRight}</span>
-            <div><div class="bc-t">Out · month</div><div class="bc-v">${fmtSats(tout)}</div></div>
+            <div>
+              <div class="bc-t">Out · month</div>
+              <div class="bc-v">${fmtSats(tout)}</div>
+              ${fiatLabel(tout) ? `<div class="bc-f">${fiatLabel(tout)}</div>` : ''}
+            </div>
           </div>
         </div>
       </div>

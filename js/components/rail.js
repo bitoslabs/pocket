@@ -14,6 +14,7 @@ import { categoryMeta, fmtSats, toMs, txRowHtml } from '../utils/ui.js';
 export class Rail extends Component {
   mounted() {
     this.watchStore('transactions', () => this.render());
+    this.watchStore('price', () => this.render());
   }
 
   template() {

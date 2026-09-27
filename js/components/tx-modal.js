@@ -7,6 +7,7 @@
 import { modal } from './modal.js';
 import { zapService } from '../services/zap-service.js';
 import { categoryService } from '../services/category-service.js';
+import { priceService } from '../services/price-service.js';
 import { Icons } from '../utils/icons.js';
 import { categoryMeta, fmtSats, playFX, toast } from '../utils/ui.js';
 
@@ -24,6 +25,9 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
     dir,
     cat: null,
   };
+
+  const fiatOn = priceService.showFiat && priceService.hasRate(priceService.currency);
+  const currency = priceService.currency;
 
   const content = document.createElement('div');
   content.className = 'tx-modal';
@@ -66,16 +70,49 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
       <input id="txAmt" type="number" min="1" inputmode="numeric" placeholder="0" autocomplete="off" />
       <span>sats</span>
     </div>
+    ${
+      fiatOn
+        ? `<div class="amt-line fiat-line">
+             <input id="txFiat" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" autocomplete="off" />
+             <span>${currency}</span>
+           </div>`
+        : ''
+    }
     <div class="cat-chips" id="txCats"></div>
     <input id="txNote" class="note-input" style="margin-top:12px"
       placeholder="Note (optional) — e.g. Ramen with the crew" maxlength="80" autocomplete="off" />
   `;
 
+  const satsInput = content.querySelector('#txAmt');
+  const fiatInput = content.querySelector('#txFiat');
+
   if (tx) {
     state.dir = TYPE_TO_DIR[tx.type] || 'out';
     state.cat = tx.category || null;
-    content.querySelector('#txAmt').value = tx.amount || '';
+    satsInput.value = tx.amount || '';
     content.querySelector('#txNote').value = tx.description || '';
+    if (fiatInput && tx.fiatAmount !== undefined && tx.fiatAmount !== null) {
+      fiatInput.value = tx.fiatAmount;
+    }
+  }
+
+  // Two-way sats ⇄ fiat binding
+  if (fiatOn && fiatInput) {
+    const syncFromSats = () => {
+      const sats = parseFloat(satsInput.value);
+      fiatInput.value = Number.isFinite(sats) && sats > 0
+        ? priceService.satsToFiat(sats).toFixed(2)
+        : '';
+    };
+    const syncFromFiat = () => {
+      const f = parseFloat(fiatInput.value);
+      satsInput.value = Number.isFinite(f) && f > 0 ? priceService.fiatToSats(f) : '';
+    };
+    satsInput.addEventListener('input', syncFromSats);
+    fiatInput.addEventListener('input', syncFromFiat);
+    if (tx && (tx.fiatAmount === undefined || tx.fiatAmount === null) && satsInput.value) {
+      syncFromSats();
+    }
   }
 
   const refreshSeg = () => {
@@ -121,36 +158,38 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
     variant: 'btn-primary',
     closeOnClick: false,
     handler: async () => {
-      const amt = parseInt(content.querySelector('#txAmt').value, 10);
+      const amt = parseInt(satsInput.value, 10);
       if (!amt || amt < 1) {
         toast('Enter an amount first', 'error');
         return false;
       }
       const note = content.querySelector('#txNote').value.trim();
       const type = DIR_TO_TYPE[state.dir];
+
+      // Snapshot the fiat value at the time of entry (when shown)
+      let fiatAmount;
+      if (fiatOn) {
+        const f = fiatInput ? parseFloat(fiatInput.value) : NaN;
+        fiatAmount = Number.isFinite(f) && f > 0 ? f : priceService.satsToFiat(amt);
+      }
+
+      const payload = { type, category: state.cat, amount: amt, description: note };
+      if (fiatOn && Number.isFinite(fiatAmount)) {
+        payload.fiatAmount = fiatAmount;
+        payload.currency = currency;
+      }
+
       try {
         if (tx) {
-          await zapService.updateTransaction(tx.id, {
-            type,
-            category: state.cat,
-            amount: amt,
-            description: note,
-          });
+          await zapService.updateTransaction(tx.id, payload);
           toast('Transaction updated');
         } else {
-          const created = await zapService.createManualTransaction({
-            type,
-            amount: amt,
-            description: note,
-            category: state.cat,
-          });
+          const created = await zapService.createManualTransaction(payload);
           if (type === 'income' || state.cat === 'tips' || state.cat === 'zaps') {
             playFX(amt, type === 'income');
           }
           toast(
-            (type === 'income' ? 'Income logged +' : 'Expense logged −') +
-              fmtSats(amt) +
-              ' sats',
+            (type === 'income' ? 'Income logged +' : 'Expense logged −') + fmtSats(amt) + ' sats',
             'success'
           );
           modal.close();
@@ -172,7 +211,7 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
     actions,
   });
 
-  setTimeout(() => content.querySelector('#txAmt')?.focus(), 320);
+  setTimeout(() => satsInput?.focus(), 320);
 }
 
 export default openTxModal;

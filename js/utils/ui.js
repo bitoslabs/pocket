@@ -6,6 +6,7 @@
  */
 
 import { eventBus, Events } from '../core/event-bus.js';
+import { priceService } from '../services/price-service.js';
 import { Icons } from './icons.js';
 
 export const $ = (sel, ctx = document) => ctx.querySelector(sel);
@@ -231,6 +232,7 @@ export function txRowHtml(tx, linkedIds = null) {
   const income = isIncome(tx);
   const dir = income ? 'in' : 'out';
   const linked = linkedIds && linkedIds.has(tx.id);
+  const fiat = priceService.showFiat ? priceService.fiatFor(tx) : '';
   return `<button class="tx" data-action="edit-tx" data-id="${tx.id}">
     <span class="tx-ic" style="background:${meta.color}1F">
       <span class="ic" style="color:${meta.color}">${Icons[meta.icon] || Icons.file}</span>
@@ -241,9 +243,24 @@ export function txRowHtml(tx, linkedIds = null) {
     linked ? ' · <i class="tx-link">✎ journal</i>' : ''
   }</span>
     </div>
-    <span class="tx-amt ${dir}">${income ? '+' : '−'}${fmtSats(amountOf(tx))}</span>
+    <span class="tx-amt ${dir}">
+      <span class="tx-sats">${income ? '+' : '−'}${fmtSats(amountOf(tx))}</span>
+      ${fiat ? `<span class="tx-fiat">${fiat}</span>` : ''}
+    </span>
   </button>`;
 }
+
+/** Fiat string for a sats amount, or '' when fiat display is off. */
+export function fiatLabel(sats) {
+  return priceService.showFiat ? priceService.formatFiat(sats) : '';
+}
+
+/** Fiat string for a stored item (uses recorded fiat if present). */
+export function fiatForItem(item) {
+  return priceService.showFiat ? priceService.fiatFor(item) : '';
+}
+
+export const fiatEnabled = () => priceService.showFiat;
 
 /** Group items by calendar day; returns [{ key, items }] */
 export function groupByDay(items, tsFn = (t) => t.created_at) {

@@ -20,6 +20,7 @@ import { journalService } from './services/journal-service.js';
 import { categoryService } from './services/category-service.js';
 import { budgetService } from './services/budget-service.js';
 import { recurringService } from './services/recurring-service.js';
+import { priceService } from './services/price-service.js';
 
 // Components
 import { Header } from './components/header.js';
@@ -61,6 +62,9 @@ class App {
 
             // Restore saved theme + accent (dark/Light, colour picker)
             initTheme();
+
+            // Load cached BTC/fiat rates (cache-first; fetch happens in background)
+            await priceService.init();
 
             await authService.init();
 

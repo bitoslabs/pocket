@@ -11,6 +11,7 @@ import { authService } from '../services/auth-service.js';
 import { journalService } from '../services/journal-service.js';
 import { nostrService } from '../services/nostr-service.js';
 import { storageService } from '../services/storage-service.js';
+import { CURRENCIES, priceService } from '../services/price-service.js';
 import { modal } from '../components/modal.js';
 import { lock } from '../components/lock.js';
 import {
@@ -42,6 +43,7 @@ export class ProfilePage extends Component {
     this.watchStore('journal', () => this.render());
     this.watchStore('relays', () => this.render());
     this.watchStore('appLock', () => this.render());
+    this.watchStore('price', () => this.render());
   }
 
   _profile() {
@@ -76,6 +78,15 @@ export class ProfilePage extends Component {
     const accent = getAccent();
     const streak = this._streak(entries);
     const relays = store.get('relays')?.connected || [];
+    const price = store.get('price') || {
+      currency: 'LAK',
+      showFiat: false,
+      rateSource: 'auto',
+      rate: 0,
+      ageLabel: '',
+      loading: false,
+      error: '',
+    };
     const savedRelays = storageService.getLocal(config.storage.keys.RELAYS) || config.relays.default;
 
     return `
@@ -140,6 +151,72 @@ export class ProfilePage extends Component {
         <div class="color-field">
           <input type="color" id="accentPicker" value="${accent.toLowerCase()}" aria-label="Custom accent color" />
           <code>Custom</code>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Money &amp; rate</h3>
+          <span class="badge ${price.error ? 'badge-error' : 'badge-neutral'}">${
+            price.loading
+              ? 'updating…'
+              : price.rateSource === 'manual'
+              ? 'manual'
+              : price.ageLabel || 'auto'
+          }</span>
+        </div>
+
+        <label class="fld" style="margin-bottom:12px">Currency
+          <select id="currencySelect" class="input">
+            ${CURRENCIES.map(
+              (c) => `<option value="${c}" ${c === price.currency ? 'selected' : ''}>${c}</option>`
+            ).join('')}
+          </select>
+        </label>
+
+        <button class="set-row" data-action="toggle-fiat" aria-pressed="${price.showFiat}">
+          <span class="ic">${Icons.wallet}</span>
+          <span><b>Show fiat values</b><span>${
+            price.showFiat ? `Comparing sats to ${price.currency}` : 'Sats only'
+          }</span></span>
+          <span class="switch ${price.showFiat ? 'on' : ''}"></span>
+        </button>
+
+        <div class="bud-top" style="margin:12px 0 6px"><span>Rate source</span></div>
+        <div class="seg">
+          <button type="button" data-action="rate-source" data-src="auto"
+            class="${price.rateSource === 'auto' ? 'on' : ''}">
+            <span class="ic">${Icons.spark}</span>Auto
+          </button>
+          <button type="button" data-action="rate-source" data-src="manual"
+            class="${price.rateSource === 'manual' ? 'on' : ''}">
+            <span class="ic">${Icons.edit}</span>Manual
+          </button>
+        </div>
+
+        ${
+          price.rateSource === 'manual'
+            ? `<label class="fld" style="margin-top:12px">Manual rate — 1 BTC in ${price.currency}
+                 <input id="manualRate" type="number" inputmode="decimal"
+                   value="${price.manualRate || ''}" placeholder="0" />
+               </label>`
+            : ''
+        }
+
+        <div class="set-row" style="cursor:default">
+          <span class="ic">${Icons.trending}</span>
+          <span style="flex:1;min-width:0"><b>1 BTC = ${
+            price.rate ? priceService.formatAmount(price.rate, price.currency) : '—'
+          }</b>
+            <span>${
+              price.error
+                ? price.error
+                : price.loading
+                ? 'updating…'
+                : price.ageLabel
+                ? 'updated ' + price.ageLabel
+                : 'not fetched yet'
+            }</span></span>
+          <button class="btn btn-ghost btn-sm" data-action="refresh-rate">Refresh</button>
         </div>
       </div>
 
@@ -249,6 +326,12 @@ export class ProfilePage extends Component {
       } else if (action === 'set-accent') {
         setAccent(el.dataset.accent);
         this.render();
+      } else if (action === 'toggle-fiat') {
+        priceService.setShowFiat(!priceService.showFiat);
+      } else if (action === 'rate-source') {
+        priceService.setRateSource(el.dataset.src);
+      } else if (action === 'refresh-rate') {
+        priceService.refresh();
       } else if (action === 'logout') {
         authService.logout();
         toast('Disconnected', 'info');
@@ -320,6 +403,15 @@ export class ProfilePage extends Component {
       this.container
         .querySelectorAll('.swatch')
         .forEach((s) => s.classList.toggle('on', s.dataset.accent === accent));
+    });
+
+    // Currency + manual rate (commit on change)
+    this.container.addEventListener('change', (e) => {
+      if (e.target.id === 'currencySelect') {
+        priceService.setCurrency(e.target.value);
+      } else if (e.target.id === 'manualRate') {
+        priceService.setManualRate(e.target.value);
+      }
     });
   }
 

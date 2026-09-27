@@ -12,6 +12,7 @@ import { Icons, hydrateIcons } from '../utils/icons.js';
 import {
   categoryMeta,
   dayLabel,
+  fiatLabel,
   fmtSats,
   groupByDay,
   inMonth,
@@ -39,6 +40,7 @@ export class MoneyPage extends Component {
   mounted() {
     this.watchStore('transactions', () => this.render());
     this.watchStore('ui.query', () => this.render());
+    this.watchStore('price', () => this.render());
   }
 
   template() {
@@ -99,9 +101,17 @@ export class MoneyPage extends Component {
       </div>
 
       <div class="stat-grid">
-        <div class="stat"><b class="vin">${Icons.downLeft}${fmtSats(tin)}</b><span>in · this month</span></div>
-        <div class="stat"><b class="vout">${Icons.upRight}${fmtSats(tout)}</b><span>out · this month</span></div>
-        <div class="stat"><b class="vnet">${net >= 0 ? '+' : '−'}${fmtSats(Math.abs(net))}</b><span>net · sats</span></div>
+        <div class="stat"><b class="vin">${Icons.downLeft}${fmtSats(tin)}</b><span>in · this month</span>${
+      fiatLabel(tin) ? `<em class="stat-fiat">${fiatLabel(tin)}</em>` : ''
+    }</div>
+        <div class="stat"><b class="vout">${Icons.upRight}${fmtSats(tout)}</b><span>out · this month</span>${
+      fiatLabel(tout) ? `<em class="stat-fiat">${fiatLabel(tout)}</em>` : ''
+    }</div>
+        <div class="stat"><b class="vnet">${net >= 0 ? '+' : '−'}${fmtSats(
+      Math.abs(net)
+    )}</b><span>net · sats</span>${
+      fiatLabel(net) ? `<em class="stat-fiat">${fiatLabel(net)}</em>` : ''
+    }</div>
         <div class="stat"><b>${monthTx.length}</b><span>transactions</span></div>
       </div>
 

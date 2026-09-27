@@ -302,6 +302,13 @@ class ZapService {
             source: transactionData.source || 'manual' // manual, recurring, etc.
         };
 
+        // Optional fiat snapshot (currency + amount at time of entry)
+        const fiatAmount = parseFloat(transactionData.fiatAmount);
+        if (Number.isFinite(fiatAmount) && transactionData.currency) {
+            transaction.fiatAmount = fiatAmount;
+            transaction.currency = String(transactionData.currency).toUpperCase();
+        }
+
         // Validate transaction data
         this._validateManualTransaction(transaction);
 

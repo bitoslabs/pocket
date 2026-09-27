@@ -14,6 +14,7 @@ import {
   categoryMeta,
   dayLabel,
   escapeHtml,
+  fiatLabel,
   fmtSats,
   groupByDay,
   isIncome,
@@ -31,6 +32,7 @@ export class JournalPage extends Component {
     this.watchStore('transactions', () => this.render());
     this.watchStore('ui.query', () => this.render());
     this.watchStore('isAuthenticated', () => this.render());
+    this.watchStore('price', () => this.render());
   }
 
   template() {
@@ -136,7 +138,9 @@ export class JournalPage extends Component {
                 const income = isIncome(t);
                 return `<span class="mchip ${income ? 'in' : 'out'}">${Icons.bolt}${
                   income ? '+' : '−'
-                }${fmtSats(t.amount)} · ${meta.label}</span>`;
+                }${fmtSats(t.amount)}${fiatLabel(t.amount) ? ' · ' + fiatLabel(t.amount) : ''} · ${
+                  meta.label
+                }</span>`;
               })
               .join('')}</div>`
           : ''

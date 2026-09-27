@@ -150,7 +150,7 @@
   --overlay: rgba(11, 9, 18, 0.38);
   /* Overlay used on the always-coloured balance hero (theme independent) */
   --hero-overlay: rgba(11, 9, 18, 0.42);
-  --topbar-bg: linear-gradient(180deg, rgba(11, 9, 18, 0.95), rgba(11, 9, 18, 0.78));
+  --dock-shadow: 0 12px 36px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.12);
   --modal-backdrop: rgba(5, 3, 10, 0.65);
 
   /* ==================== Gradients ==================== */
@@ -235,7 +235,7 @@
   --glass-bg: rgba(255, 255, 255, 0.82);
   --glass-bg-thick: rgba(255, 255, 255, 0.95);
   --overlay: rgba(255, 255, 255, 0.6);
-  --topbar-bg: linear-gradient(180deg, rgba(245, 243, 251, 0.95), rgba(245, 243, 251, 0.78));
+  --dock-shadow: 0 10px 28px rgba(42, 29, 71, 0.13), 0 2px 7px rgba(42, 29, 71, 0.06);
   --modal-backdrop: rgba(40, 32, 60, 0.4);
 
   --shadow-sm: 0 1px 2px rgba(30, 20, 60, 0.08);

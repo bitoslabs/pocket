@@ -246,6 +246,11 @@ export class AboutPage extends Component {
         ${this._donateHtml()}
       </div>
 
+      <div class="card" style="padding:6px 16px">
+        <button class="set-row" data-action="force-update"><span class="ic">${Icons.undo}</span>
+          <span><b>${t('about.forceUpdate')}</b><span>${t('about.forceUpdateSub')}</span></span></button>
+      </div>
+
       <p class="muted-p" style="margin-bottom:24px">
         ZapJournal v${this.escape(version)} · ${t('about.footer')}
       </p>
@@ -273,8 +278,56 @@ export class AboutPage extends Component {
             toast(t('about.stillNoLn'), 'warning');
           }
         });
+      } else if (action === 'force-update') {
+        this._forceUpdate(el);
       }
     });
+  }
+
+  /** Clear only cached app files and reload the current release. */
+  async _forceUpdate(button) {
+    if (!navigator.onLine) {
+      toast(t('about.updateOffline'), 'warning');
+      return;
+    }
+
+    button.disabled = true;
+    try {
+      if (!('serviceWorker' in navigator)) {
+        location.reload();
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration) {
+        await registration.update();
+        const worker = registration.waiting || registration.installing;
+        if (worker) {
+          toast(t('about.updateInstalling'), 'info');
+          worker.postMessage('skipWaiting');
+          // index.html reloads when the new worker takes control.
+          if (!navigator.serviceWorker.controller) setTimeout(() => location.reload(), 500);
+          return;
+        }
+      }
+
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames
+            .filter((name) => name.startsWith('zap-journal-'))
+            .map((name) => caches.delete(name))
+        );
+      }
+      if (registration) await registration.unregister();
+
+      toast(t('about.updateReloading'), 'info');
+      setTimeout(() => location.reload(), 250);
+    } catch (err) {
+      console.warn('[App] Force update failed:', err);
+      button.disabled = false;
+      toast(t('about.updateFailed'), 'warning');
+    }
   }
 
   afterRender() {

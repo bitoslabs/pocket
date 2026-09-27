@@ -201,11 +201,22 @@
     <!-- Service Worker Registration -->
     <script>
       if ("serviceWorker" in navigator) {
+        // A new worker has a complete release cached before it takes control.
+        const hadController = Boolean(navigator.serviceWorker.controller);
+        if (hadController) {
+          navigator.serviceWorker.addEventListener("controllerchange", () => {
+            window.location.reload();
+          }, { once: true });
+        }
         window.addEventListener("load", () => {
+          // The deploy script stamps a unique worker filename for each release.
+          // This bypasses any stale CDN cache entry for an older worker URL.
+          const workerFile = "service-worker.__DEPLOY_HASH__.js";
           navigator.serviceWorker
-            .register(new URL("service-worker.js", document.baseURI))
+            .register(new URL(workerFile, document.baseURI))
             .then((registration) => {
               console.log("[SW] Registered:", registration.scope);
+              return registration.update();
             })
             .catch((error) => {
               console.log("[SW] Registration failed:", error);

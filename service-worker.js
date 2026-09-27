@@ -3,7 +3,8 @@
  * Offline support and caching for PWA
  */
 
-const CACHE_NAME = 'zap-journal-v6';
+// The deployment script replaces this token with a hash of the published files.
+const CACHE_NAME = 'zap-journal-__DEPLOY_HASH__';
 const STATIC_ASSETS = [
     './',
     'index.html',
@@ -72,7 +73,8 @@ self.addEventListener('install', (event) => {
         caches.open(CACHE_NAME)
             .then((cache) => {
                 console.log('[SW] Caching static assets');
-                return cache.addAll(STATIC_ASSETS);
+                // Bypass the HTTP cache so a new worker stores the new release.
+                return cache.addAll(STATIC_ASSETS.map((asset) => new Request(asset, { cache: 'reload' })));
             })
             .then(() => {
                 console.log('[SW] Install complete');
@@ -80,6 +82,7 @@ self.addEventListener('install', (event) => {
             })
             .catch((error) => {
                 console.error('[SW] Install failed:', error);
+                throw error;
             })
     );
 });
@@ -93,7 +96,7 @@ self.addEventListener('activate', (event) => {
             .then((cacheNames) => {
                 return Promise.all(
                     cacheNames
-                        .filter((name) => name !== CACHE_NAME)
+                        .filter((name) => name.startsWith('zap-journal-') && name !== CACHE_NAME)
                         .map((name) => {
                             console.log('[SW] Deleting old cache:', name);
                             return caches.delete(name);
@@ -107,7 +110,7 @@ self.addEventListener('activate', (event) => {
     );
 });
 
-// Fetch event - serve from cache, fall back to network
+// Fetch event - check the network for pages, cache app assets for offline use.
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
@@ -124,6 +127,14 @@ self.addEventListener('fetch', (event) => {
 
     // Skip external requests (except fonts)
     if (url.origin !== location.origin && !url.hostname.includes('fonts.')) {
+        return;
+    }
+
+    if (request.mode === 'navigate') {
+        event.respondWith(
+            fetch(request, { cache: 'no-store' })
+                .catch(async () => (await caches.match('index.html')) || Response.error())
+        );
         return;
     }
 

@@ -170,7 +170,7 @@ class MyComponent extends Component {
 
 ## PWA / offline
 
-- `service-worker.js` precaches the full module graph (relative paths, so it works under a sub-path) and serves cache-first with an `index.html` navigation fallback.
+- `service-worker.js` precaches the full module graph (relative paths, so it works under a sub-path). Navigation uses the network when available and falls back to the cached `index.html` offline. App assets are cache-first within each release. The deploy script hashes published files into the worker cache name so a changed release replaces the old cache.
 - External resources (`nostr-tools` from a CDN, Google Fonts) are intentionally not cached by the SW. `nostr-tools` is required for signing/encryption, so offline authentication needs a cached/self-hosted copy.
 - IndexedDB persists all local data across offline reloads.
 - PWA icons are generated with `npm run icons` (`scripts/generate-icons.mjs`, dependency-free PNG writer); `icon-192`/`icon-512` are precached.

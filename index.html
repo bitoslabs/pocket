@@ -201,11 +201,19 @@
     <!-- Service Worker Registration -->
     <script>
       if ("serviceWorker" in navigator) {
+        // A new worker has a complete release cached before it takes control.
+        const hadController = Boolean(navigator.serviceWorker.controller);
+        if (hadController) {
+          navigator.serviceWorker.addEventListener("controllerchange", () => {
+            window.location.reload();
+          }, { once: true });
+        }
         window.addEventListener("load", () => {
           navigator.serviceWorker
             .register(new URL("service-worker.js", document.baseURI))
             .then((registration) => {
               console.log("[SW] Registered:", registration.scope);
+              return registration.update();
             })
             .catch((error) => {
               console.log("[SW] Registration failed:", error);

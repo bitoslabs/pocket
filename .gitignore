@@ -25,4 +25,9 @@ logs
 
 docs/source
 .kilo/
-deploy/
+deploy/*
+!deploy/check.mjs
+!deploy/deploy.sh
+!deploy/graph.mjs
+!deploy/pocket.bitos.space.conf
+!deploy/site.md

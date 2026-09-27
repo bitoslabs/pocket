@@ -28,7 +28,11 @@ The guiding principle is **local-first**: every action is written to the local d
 ├── index.html              # Entry point, loader, SW registration
 ├── manifest.json           # PWA manifest
 ├── service-worker.js       # Offline asset cache (relative paths)
-├── package.json            # npm scripts (node --test)
+├── package.json            # npm scripts (node --test, icon generation)
+├── assets/icons/           # Generated PWA icons (icon-<size>.png)
+├── scripts/
+│   ├── check-precache.mjs  # Precache/import integrity (`npm run check`)
+│   └── generate-icons.mjs  # Regenerates the icon set (`npm run icons`)
 ├── css/
 │   ├── variables.css       # Design tokens
 │   ├── base.css            # Reset & typography
@@ -62,13 +66,16 @@ The guiding principle is **local-first**: every action is written to the local d
 │   │   ├── header.js, sidebar.js, tabbar.js, rail.js, lock.js
 │   │   ├── modal.js, toast.js, quick-add.js, tx-modal.js
 │   │   ├── journal-composer.js, budgets-modal.js, login-modal.js
-│   │   ├── transaction-form.js, budget-progress.js, category-manager.js
+│   │   ├── transaction-form.js, category-manager.js
 │   └── pages/
 │       ├── dashboard.js, transactions.js, journal.js, settings.js
 ├── tests/
 │   ├── account.test.js     # Owner scoping
+│   ├── money.test.js       # Balance & month totals
 │   ├── outbox.test.js      # Queue coalescing
-│   └── price.test.js       # Sats ⇄ fiat conversion
+│   ├── price.test.js       # Sats ⇄ fiat conversion
+│   ├── sync.test.js        # Event building
+│   └── sync-merge.test.js  # Merge / LWW / claim
 └── docs/
     └── architecture.md     # This file
 ```
@@ -116,7 +123,7 @@ Repeated edits to the same record coalesce. Entries survive reloads and are repl
 ### Nostr event mapping
 
 - **Finance records** (transaction, budget, category, recurring): NIP-78 app-data, `kind 30078` parameterized-replaceable with `d = "zapjournal:<entity>:<id>"` and an `app` tag; content is NIP-04 self-encrypted. Replaceable events make re-publishing idempotent; deletes publish a tombstone record.
-- **Journal:** self-DM `kind 4`, content self-encrypted, with `app` and `client` tags; deletes use `kind 5`. Incoming kind 4/5 are reconciled (the `client` tag prevents duplicates of your own published entries).
+- **Journal:** encrypted NIP-78 app-data, `kind 30078` with `d = "zapjournal:journal:<id>"`. Because the record is replaceable, edits are idempotent upserts and deletes are tombstones — the same model as finance data. Legacy entries published as self-DM `kind 4` are still read and reconciled (the `client` tag dedupes your own echoes).
 - Zap receipts (`kind 9735`) remain inbound-only.
 
 ### Relays (`services/nostr-service.js`)
@@ -166,6 +173,7 @@ class MyComponent extends Component {
 - `service-worker.js` precaches the full module graph (relative paths, so it works under a sub-path) and serves cache-first with an `index.html` navigation fallback.
 - External resources (`nostr-tools` from a CDN, Google Fonts) are intentionally not cached by the SW. `nostr-tools` is required for signing/encryption, so offline authentication needs a cached/self-hosted copy.
 - IndexedDB persists all local data across offline reloads.
+- PWA icons are generated with `npm run icons` (`scripts/generate-icons.mjs`, dependency-free PNG writer); `icon-192`/`icon-512` are precached.
 
 ## Authentication
 
@@ -191,12 +199,14 @@ Open `http://localhost:8000`. A PIN lock is optional and off by default.
 Pure/browser-independent logic is covered by Node's built-in test runner:
 
 ```bash
-npm test        # node --test
+npm run check   # static integrity: precache entries exist, all js/css precached, imports resolve
+npm test        # runs the check, then node --test
 ```
 
 Tests live in `tests/` and cover account scoping (`ownerVisible`/`filterOwned`),
-outbox coalescing, and sats ⇄ fiat conversion. They stub browser-only storage,
-so no build step or browser is required.
+outbox coalescing, sats ⇄ fiat conversion, balance math, sync event building, and
+the sync engine's merge (last-write-wins + tombstones) and guest-claim paths.
+They stub browser-only storage/encryption, so no build step or browser is required.
 
 ## Requirements
 
@@ -207,7 +217,7 @@ so no build step or browser is required.
 ## Known limitations
 
 - Merge is last-write-wins; no per-field merge or CRDT.
-- Journal is create/delete only (no edit path).
-- Guest data at rest is unencrypted until the account is connected.
-- Test coverage is limited to pure logic (no DOM/IndexedDB or end-to-end tests).
+- Journal entries created before the kind-30078 migration remain self-DMs; editing one republishes it as a replaceable record, so on a fresh device the old kind-4 copy may also appear (duplicate until re-edited).
+- Guest data at rest is unencrypted until the account is connected (surfaced by a dismissible "Local mode" notice on Home and in Journal).
+- Tests stub storage and cover pure logic plus the sync merge/claim paths; there are no real IndexedDB, DOM, or end-to-end tests.
 - No build/lint tooling; the app ships as plain ES modules.

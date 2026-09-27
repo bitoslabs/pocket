@@ -8,6 +8,7 @@ import { Component } from '../core/component.js';
 import { store } from '../core/state.js';
 import { budgetService } from '../services/budget-service.js';
 import { categoryService } from '../services/category-service.js';
+import { storageService } from '../services/storage-service.js';
 import { routeTo } from '../router.js';
 import { Icons, hydrateIcons } from '../utils/icons.js';
 import {
@@ -65,6 +66,9 @@ export class HomePage extends Component {
     const name = (store.get('user')?.npub || '').slice(0, 6);
     const helloName = authenticated && name ? name : 'friend';
 
+    const showLocalNotice =
+      !authenticated && !storageService.getLocal('app_local_notice_dismissed', false);
+
     return `
       <div class="hi">${greeting()}, ${escapeHtml(helloName)} 👋</div>
       <div class="hi-sub">${now.toLocaleDateString('en-US', {
@@ -72,6 +76,20 @@ export class HomePage extends Component {
         month: 'long',
         day: 'numeric',
       })} · your private corner</div>
+
+      ${
+        showLocalNotice
+          ? `<div class="card local-notice">
+               <div class="card-head"><h3>Local mode</h3>
+                 <button class="btn btn-ghost btn-sm" data-action="dismiss-local">Dismiss</button>
+               </div>
+               <p class="muted-p" style="text-align:left;padding:0 0 12px">
+                 You can use ZapJournal without an account — everything is saved on this device.
+                 Data stays unencrypted until you connect Nostr, and syncs automatically after you log in.
+               </p>
+             </div>`
+          : ''
+      }
 
       ${
         authenticated
@@ -192,6 +210,9 @@ export class HomePage extends Component {
       if (action === 'connect') {
         const { loginModal } = await import('../components/login-modal.js');
         loginModal.show();
+      } else if (action === 'dismiss-local') {
+        storageService.setLocal('app_local_notice_dismissed', true);
+        this.render();
       } else if (action === 'go-money') {
         routeTo('money');
       } else if (action === 'go-journal') {

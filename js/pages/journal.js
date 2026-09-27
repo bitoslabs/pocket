@@ -7,7 +7,6 @@
 import { Component } from '../core/component.js';
 import { store } from '../core/state.js';
 import { journalService } from '../services/journal-service.js';
-import { storageService } from '../services/storage-service.js';
 import { modal } from '../components/modal.js';
 import { Icons, hydrateIcons } from '../utils/icons.js';
 import {
@@ -153,6 +152,9 @@ export class JournalPage extends Component {
           : ''
       }
       <div class="jacts">
+        <button class="act" data-action="entry-edit" data-id="${entry.id}">
+          <span class="ic">${Icons.edit}</span>Edit
+        </button>
         <button class="act" data-action="attach-money" data-id="${entry.id}">
           <span class="ic">${Icons.bolt}</span>Money
         </button>
@@ -190,6 +192,9 @@ export class JournalPage extends Component {
             if (tx) this._linkMoney(id, tx.id);
           },
         });
+      } else if (action === 'entry-edit') {
+        const entry = (store.get('journal') || []).find((e) => e.id === el.dataset.id);
+        if (entry) this._openEditEntry(entry);
       } else if (action === 'entry-del') {
         const id = el.dataset.id;
         const confirmed = await modal.confirm({
@@ -209,20 +214,53 @@ export class JournalPage extends Component {
     });
   }
 
+  _openEditEntry(entry) {
+    const content = document.createElement('div');
+    content.innerHTML = `
+      <textarea id="editEntryText" class="note-input" rows="6"
+        style="width:100%;min-height:150px;margin-top:8px"
+        placeholder="Edit your entry…">${escapeHtml(entry.text || '')}</textarea>
+    `;
+
+    modal.open({
+      title: 'Edit entry',
+      content,
+      actions: [
+        { label: 'Cancel', variant: 'btn-ghost', handler: () => {} },
+        {
+          label: 'Save',
+          variant: 'btn-primary',
+          closeOnClick: false,
+          handler: async () => {
+            const text = content.querySelector('#editEntryText').value.trim();
+            if (!text) {
+              toast('Write something first ✍️', 'error');
+              return false;
+            }
+            try {
+              await journalService.updateEntry(entry.id, {
+                text,
+                title: text.split('\n')[0].slice(0, 60) || 'Journal entry',
+              });
+              toast('Entry updated');
+              modal.close();
+            } catch (err) {
+              toast(err.message || 'Could not update entry', 'error');
+            }
+            return false;
+          },
+        },
+      ],
+    });
+  }
+
   async _linkMoney(entryId, txId) {
-    const entries = store.get('journal') || [];
-    const idx = entries.findIndex((e) => e.id === entryId);
-    if (idx < 0) return;
-    const updatedEntry = { ...entries[idx], linkedTransaction: txId };
-    const updated = [...entries];
-    updated[idx] = updatedEntry;
-    store.set('journal', updated);
     try {
-      await storageService.put('journal', updatedEntry);
+      await journalService.updateEntry(entryId, { linkedTransaction: txId });
+      toast('Money attached to entry ⚡');
     } catch (e) {
-      /* ignore */
+      toast(e.message || 'Could not attach money', 'error');
     }
-    toast('Money attached to entry ⚡');
   }
 
   afterRender() {

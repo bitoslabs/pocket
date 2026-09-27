@@ -59,14 +59,14 @@ body.app-ready .app {
   border-radius: 10px;
   display: grid;
   place-items: center;
-  color: #fff;
-  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  overflow: hidden;
   box-shadow: 0 4px 14px var(--accent-soft);
 }
 
-.brand-mark.ic svg {
-  width: 16px;
-  height: 16px;
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .brand-name {
@@ -135,7 +135,7 @@ body.app-ready .app {
   display: block;
 }
 
-.search-wrap .ic {
+.search-wrap > .ic {
   position: absolute;
   left: 14px;
   top: 50%;
@@ -146,7 +146,7 @@ body.app-ready .app {
 
 .search-wrap input {
   width: 100%;
-  padding: 11px 16px 11px 44px;
+  padding: 11px 40px 11px 44px;
   border-radius: var(--radius-xl);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -161,6 +161,48 @@ body.app-ready .app {
 
 .search-wrap input::placeholder {
   color: var(--muted);
+}
+
+.search-wrap input::-webkit-search-cancel-button,
+.search-wrap input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.search-clear:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.search-clear:active {
+  transform: translateY(-50%) scale(0.9);
+}
+
+.search-clear[hidden] {
+  display: none;
+}
+
+.search-clear .ic svg {
+  width: 15px;
+  height: 15px;
 }
 
 /* ==================== Sidebar (desktop) ==================== */

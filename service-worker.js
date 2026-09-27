@@ -3,11 +3,14 @@
  * Offline support and caching for PWA
  */
 
-const CACHE_NAME = 'zap-journal-v2';
+const CACHE_NAME = 'zap-journal-v4';
 const STATIC_ASSETS = [
     './',
     'index.html',
     'manifest.json',
+    'assets/icons/logo-mark.svg',
+    'assets/icons/icon-192.png',
+    'assets/icons/icon-512.png',
     'css/variables.css',
     'css/base.css',
     'css/layout.css',
@@ -23,6 +26,7 @@ const STATIC_ASSETS = [
     'js/services/storage-service.js',
     'js/services/auth-service.js',
     'js/services/nostr-service.js',
+    'js/services/profile-service.js',
     'js/services/zap-service.js',
     'js/services/journal-service.js',
     'js/services/category-service.js',
@@ -48,12 +52,12 @@ const STATIC_ASSETS = [
     'js/components/budgets-modal.js',
     'js/components/login-modal.js',
     'js/components/transaction-form.js',
-    'js/components/budget-progress.js',
     'js/components/category-manager.js',
     'js/pages/dashboard.js',
     'js/pages/transactions.js',
     'js/pages/journal.js',
-    'js/pages/settings.js'
+    'js/pages/settings.js',
+    'js/pages/about.js'
 ];
 
 // Install event - cache static assets

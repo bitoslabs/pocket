@@ -10,7 +10,17 @@ export const config = {
     app: {
         name: 'ZapJournal',
         version: '1.0.0',
-        description: 'Private journal and Lightning sats tracker on Nostr'
+        description: 'Private journal and Lightning sats tracker on Nostr',
+        homepage: 'https://bitos.space',
+        repository: 'https://github.com/bitoslabs/pocket'
+    },
+
+    // Team — Nostr identities shown on the About page
+    team: {
+        // Maintainer / owner: donate Lightning address is resolved from here
+        owner: 'npub12l8q8wph9ygk0hv00pf8g558pvftr0hav2r8npfq66nm04sswnwsylp57e',
+        // Contributor
+        contributor: 'npub1ujh9lp7vw38yatm0vsxy7xuwxl3j98qvnyatyyg9xszufpyxn2fskqagph'
     },
 
     // Nostr relay configuration
@@ -106,6 +116,7 @@ export const config = {
 // Freeze config to prevent modifications
 Object.freeze(config);
 Object.freeze(config.app);
+Object.freeze(config.team);
 Object.freeze(config.relays);
 Object.freeze(config.kinds);
 Object.freeze(config.storage);

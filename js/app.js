@@ -40,6 +40,7 @@ import { HomePage } from './pages/dashboard.js';
 import { JournalPage } from './pages/journal.js';
 import { MoneyPage } from './pages/transactions.js';
 import { ProfilePage } from './pages/settings.js';
+import { AboutPage } from './pages/about.js';
 
 class App {
     constructor() {
@@ -164,6 +165,7 @@ class App {
             journal: { component: JournalPage, title: 'Journal' },
             money: { component: MoneyPage, title: 'Money' },
             profile: { component: ProfilePage, title: 'Profile' },
+            about: { component: AboutPage, title: 'About' },
         });
 
         router.setNotFound(() => {
@@ -186,12 +188,7 @@ class App {
                 openQuickAdd();
             } else if (e.key === '/') {
                 e.preventDefault();
-                const wrap = document.getElementById('searchWrap');
-                const input = document.getElementById('searchInput');
-                if (wrap && input) {
-                    if (window.innerWidth < 1000) wrap.classList.add('open');
-                    input.focus();
-                }
+                this._header?.openSearch();
             }
         });
 

@@ -142,7 +142,6 @@ export const Events = {
     TRANSACTION_DELETED: 'transaction:deleted',
     MANUAL_TRANSACTION_CREATED: 'manual_transaction:created',
     PRICE_UPDATED: 'price:updated',
-    BUDGET_CLICKED: 'budget:clicked',
     CATEGORY_SELECTED: 'category:selected',
 
     // Offline-first sync events

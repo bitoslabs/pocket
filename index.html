@@ -20,6 +20,7 @@
 
     <!-- PWA -->
     <link rel="manifest" href="manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="assets/icons/logo-mark.svg" />
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
 
     <title>ZapJournal 🔒 — Private Journal & Sats</title>
@@ -54,8 +55,7 @@
   <body>
     <div class="bg"></div>
 
-    <!-- PWA Loading Screen
-         Inline SVG so the mark paints before any JS/CSS module loads. -->
+    <!-- PWA Loading Screen -->
     <div
       class="app-loader"
       id="app-loading"
@@ -69,9 +69,7 @@
         <span class="loader-ring loader-ring--inner" aria-hidden="true"></span>
         <div class="loader-mark">
           <span class="loader-shine" aria-hidden="true"></span>
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
-          </svg>
+          <img src="assets/icons/logo-mark.svg" alt="" />
         </div>
       </div>
       <div class="loader-brand">
@@ -110,7 +108,7 @@
     <!-- Lock Screen -->
     <div class="lockscr" id="lockscr" role="dialog" aria-modal="true" hidden>
       <div class="lock-brand">
-        <span class="lock-mark ic" data-icon="bolt"></span>
+        <span class="lock-mark"><img src="assets/icons/logo-mark.svg" alt="" /></span>
         <h1>Zap<em>Journal</em></h1>
       </div>
       <div class="lock-title" id="lockTitle">Create your PIN</div>

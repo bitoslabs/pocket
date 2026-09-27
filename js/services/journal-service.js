@@ -120,6 +120,7 @@ class JournalService {
                 linkedTransaction: tags.e,
                 created_at: event.created_at,
                 updated_at: entryData.updated_at || event.created_at,
+                updatedAt: (entryData.updated_at || event.created_at) * 1000,
                 eventId: event.id,
                 raw: event
             };
@@ -189,6 +190,7 @@ class JournalService {
             linkedTransaction,
             created_at: createdAt,
             updated_at: createdAt,
+            updatedAt: createdAt * 1000,
         };
 
         const entries = store.get('journal') || [];
@@ -214,6 +216,58 @@ class JournalService {
 
         eventBus.emit(Events.JOURNAL_UPDATED, { entry, action: 'create' });
         return entry;
+    }
+
+    /**
+     * Update an existing entry (local-first, synced as a replaceable record).
+     * @param {string} id
+     * @param {Object} updates - { text, title, mood, tags, tag }
+     * @returns {Promise<Object>} Updated entry
+     */
+    async updateEntry(id, updates = {}) {
+        const entry = this.getEntry(id);
+        if (!entry) throw new Error('Entry not found');
+
+        const now = Date.now();
+        const tagList = Array.isArray(updates.tags) ? updates.tags : entry.tags;
+
+        const updated = {
+            ...entry,
+            ...updates,
+            tags: tagList,
+            tag: updates.tag || tagList?.[0] || entry.tag,
+            updatedAt: now,
+            updated_at: Math.floor(now / 1000),
+        };
+
+        const entries = store.get('journal') || [];
+        const i = entries.findIndex(e => e.id === id);
+        if (i >= 0) {
+            const next = [...entries];
+            next[i] = updated;
+            store.set('journal', next);
+        }
+        await storageService.put('journal', updated);
+
+        await outbox.enqueue({
+            entity: 'journal',
+            entityId: id,
+            op: 'upsert',
+            owner: updated.owner || currentOwner(),
+            payload: {
+                title: updated.title,
+                text: updated.text,
+                mood: updated.mood,
+                tag: updated.tag,
+                tags: tagList,
+                linkedTransaction: updated.linkedTransaction || null,
+                created_at: updated.created_at,
+            },
+            updatedAt: now,
+        });
+
+        eventBus.emit(Events.JOURNAL_UPDATED, { entry: updated, action: 'update' });
+        return updated;
     }
 
     /**
@@ -277,13 +331,13 @@ class JournalService {
         store.set('journal', entries.filter(e => e.id !== id));
         await storageService.delete('journal', id);
 
-        // Queue the kind 5 delete (needs eventId once the entry was published)
+        // Queue a replaceable-record tombstone (synced as NIP-78 app data)
         await outbox.enqueue({
             entity: 'journal',
             entityId: id,
             op: 'delete',
             owner,
-            payload: entry.eventId ? { eventId: entry.eventId } : null,
+            payload: null,
             updatedAt: Date.now(),
         });
 

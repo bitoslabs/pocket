@@ -226,7 +226,7 @@ class BudgetService {
         }
 
         const now = Date.now();
-        const periodRange = this._getPeriodRange(budget.period, budget.startDate, budget.endDate);
+        const periodRange = this._getPeriodRange(budget.period, budget.startDate, budget.endDate, now);
         
         // Get transactions for this budget period
         const transactions = zapService.getTransactions({
@@ -240,13 +240,17 @@ class BudgetService {
             .reduce((sum, tx) => sum + tx.amount, 0);
 
         const remaining = budget.amount - spent;
-        const percentage = Math.min((spent / budget.amount) * 100, 100);
-        
-        // Determine status
+        // Real, unclamped utilization. Consumers clamp for bar widths but the
+        // true value is kept so over-budget amounts stay visible.
+        const percentage = budget.amount > 0 ? (spent / budget.amount) * 100 : 0;
+
+        // Determine status from the budget's own alertThreshold (the global
+        // pair is only the default when a budget has none).
+        const { warning, danger } = this._getThresholds(budget);
         let status = 'on-track';
-        if (percentage >= this._alertThresholds.danger * 100) {
+        if (percentage >= danger * 100) {
             status = 'danger';
-        } else if (percentage >= this._alertThresholds.warning * 100) {
+        } else if (percentage >= warning * 100) {
             status = 'warning';
         }
 
@@ -362,41 +366,58 @@ class BudgetService {
     }
 
     /**
+     * Resolve the warning/danger thresholds for a budget.
+     * The budget's own `alertThreshold` is the warning point; danger keeps the
+     * same gap above it as the global defaults, so the default budget (0.7)
+     * still turns danger at 0.9.
+     * @private
+     */
+    _getThresholds(budget) {
+        const raw = budget && typeof budget.alertThreshold === 'number'
+            ? budget.alertThreshold
+            : this._alertThresholds.warning;
+        const warning = Math.min(1, Math.max(0, raw));
+        const gap = this._alertThresholds.danger - this._alertThresholds.warning;
+        const danger = Math.min(1, warning + gap);
+        return { warning, danger };
+    }
+
+    /**
      * Get period start and end dates
      * @private
      */
-    _getPeriodRange(period, startDate, endDate) {
-        const now = Date.now();
-        
+    _getPeriodRange(period, startDate, endDate, now = Date.now()) {
         if (endDate) {
             return { start: startDate, end: endDate };
         }
 
-        const start = new Date(startDate);
-        const end = new Date();
+        // Recurring budgets (no endDate) always measure the current period,
+        // never the period they happened to be created in.
+        const start = new Date(now);
+        const end = new Date(now);
 
         switch (period) {
             case 'daily':
                 start.setHours(0, 0, 0, 0);
                 end.setHours(23, 59, 59, 999);
                 break;
-                
-            case 'weekly':
+
+            case 'weekly': {
                 const dayOfWeek = start.getDay();
                 start.setDate(start.getDate() - dayOfWeek);
                 start.setHours(0, 0, 0, 0);
-                end.setDate(start.getDate() + 6);
+                end.setTime(start.getTime() + 6 * 24 * 60 * 60 * 1000);
                 end.setHours(23, 59, 59, 999);
                 break;
-                
+            }
+
             case 'monthly':
                 start.setDate(1);
                 start.setHours(0, 0, 0, 0);
-                end.setMonth(start.getMonth() + 1);
-                end.setDate(0);
+                end.setMonth(start.getMonth() + 1, 0);
                 end.setHours(23, 59, 59, 999);
                 break;
-                
+
             case 'yearly':
                 start.setMonth(0, 1);
                 start.setHours(0, 0, 0, 0);
@@ -405,8 +426,13 @@ class BudgetService {
                 break;
         }
 
+        // The window ends at the current period but a budget can only count
+        // spend from when it started.
+        const windowStart = start.getTime();
+        const lowerBound = startDate ? Math.max(windowStart, startDate) : windowStart;
+
         return {
-            start: start.getTime(),
+            start: lowerBound,
             end: end.getTime()
         };
     }

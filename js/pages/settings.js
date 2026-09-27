@@ -329,6 +329,12 @@ export class ProfilePage extends Component {
       </div>
 
       <div class="card" style="padding:6px 16px">
+        <a class="set-row" href="#about"><span class="ic">${Icons.info}</span>
+          <span><b>About ZapJournal</b><span>Contributors, source &amp; donate</span></span>
+          <span class="ic" style="margin-left:auto">${Icons.chevR}</span></a>
+      </div>
+
+      <div class="card" style="padding:6px 16px">
         <button class="set-row danger" data-action="reset"><span class="ic">${Icons.trash}</span>
           <span><b>Reset app</b><span>Wipe all entries &amp; transactions</span></span></button>
       </div>

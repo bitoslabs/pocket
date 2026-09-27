@@ -15,6 +15,7 @@ const NAV = [
   { id: 'journal', label: 'Journal', icon: 'book' },
   { id: 'money', label: 'Money', icon: 'wallet' },
   { id: 'profile', label: 'Profile', icon: 'user' },
+  { id: 'about', label: 'About', icon: 'info' },
 ];
 
 export class Sidebar extends Component {
@@ -34,7 +35,7 @@ export class Sidebar extends Component {
 
     return `
       <div class="side-brand">
-        <span class="brand-mark ic">${Icons.bolt}</span>
+        <span class="brand-mark"><img src="assets/icons/logo-mark.svg" alt="" /></span>
         <span class="brand-name">Zap<em>Journal</em></span>
       </div>
       <nav class="side-nav">

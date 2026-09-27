@@ -12,7 +12,6 @@
  * @module services/sync-service
  */
 
-import { config } from '../config.js';
 import { eventBus, Events } from '../core/event-bus.js';
 import { store } from '../core/state.js';
 import { GUEST, currentOwner } from '../core/account.js';
@@ -179,14 +178,6 @@ class SyncService {
   }
 
   async _publishEntry(entry, owner) {
-    // A journal delete for an entry that was never published has nothing to
-    // tell the network; the local removal is enough.
-    if (entry.entity === 'journal' && entry.op === 'delete' && !entry.payload?.eventId) {
-      entry.state = 'done';
-      await outbox.update(entry);
-      return false;
-    }
-
     try {
       const event = await this._buildEvent(entry, owner);
       const signed = await authService.signEvent(event);
@@ -238,53 +229,44 @@ class SyncService {
     };
   }
 
-  /** Journal uses encrypted self-DMs (kind 4); deletes use kind 5. */
+  /**
+   * Journal now syncs as encrypted NIP-78 app-data (kind 30078), the same
+   * replaceable record model as finance data, so edits are idempotent upserts.
+   */
   async _buildJournalEvent(entry, owner) {
-    if (entry.op === 'delete') {
-      return {
-        kind: config.kinds.DELETE,
-        pubkey: owner,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [['e', entry.payload.eventId]],
-        content: 'Deleted by user',
-      };
-    }
-
+    const d = `zapjournal:journal:${entry.entityId}`;
     const data = entry.payload || {};
     const tagList = Array.isArray(data.tags) ? data.tags : data.tag ? [data.tag] : [];
-    const content = JSON.stringify({
-      title: data.title,
-      text: data.text,
-      mood: data.mood || null,
-      tags: tagList,
-      updated_at: Math.floor((entry.updatedAt || Date.now()) / 1000),
-    });
-    const encrypted = await authService.encrypt(owner, content);
 
-    const tags = [
-      ['p', owner],
-      ['app', APP_TAG],
-      ['client', entry.entityId],
-    ];
-    const seen = new Set();
-    tagList.forEach((t) => {
-      if (!seen.has(t)) {
-        seen.add(t);
-        tags.push(['t', t]);
-      }
-    });
-    if (!tagList.length && data.tag) tags.push(['t', data.tag]);
-    if (data.linkedTransaction) {
-      const tx = await storageService.get('transactions', data.linkedTransaction);
-      tags.push(['e', tx?.eventId || data.linkedTransaction]);
-    }
-
+    const payload = {
+      v: 1,
+      entity: 'journal',
+      id: entry.entityId,
+      deleted: entry.op === 'delete',
+      updatedAt: entry.updatedAt,
+      data:
+        entry.op === 'delete'
+          ? null
+          : {
+              title: data.title,
+              text: data.text,
+              mood: data.mood || null,
+              tag: tagList[0] || data.tag || 'personal',
+              tags: tagList,
+              linkedTransaction: data.linkedTransaction || null,
+              created_at: data.created_at,
+            },
+    };
+    const content = await authService.encrypt(owner, JSON.stringify(payload));
     return {
-      kind: config.kinds.ENCRYPTED_DM,
+      kind: KIND_APP_DATA,
       pubkey: owner,
       created_at: Math.floor(Date.now() / 1000),
-      tags,
-      content: encrypted,
+      tags: [
+        ['d', d],
+        ['app', APP_TAG],
+      ],
+      content,
     };
   }
 
@@ -376,19 +358,31 @@ class SyncService {
   }
 
   _upsertState(entity, record) {
-    if (entity !== 'transaction') return;
-    const txs = [...(store.get('transactions') || [])];
-    const i = txs.findIndex((t) => t.id === record.id);
-    if (i >= 0) txs[i] = record;
-    else txs.unshift(record);
-    txs.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-    store.set('transactions', txs);
+    if (entity === 'transaction') {
+      const txs = [...(store.get('transactions') || [])];
+      const i = txs.findIndex((t) => t.id === record.id);
+      if (i >= 0) txs[i] = record;
+      else txs.unshift(record);
+      txs.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+      store.set('transactions', txs);
+      return;
+    }
+    if (entity === 'journal') {
+      const entries = [...(store.get('journal') || [])];
+      const i = entries.findIndex((e) => e.id === record.id);
+      if (i >= 0) entries[i] = record;
+      else entries.unshift(record);
+      entries.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+      store.set('journal', entries);
+    }
   }
 
   _removeFromState(entity, id) {
-    if (entity !== 'transaction') return;
-    const txs = (store.get('transactions') || []).filter((t) => t.id !== id);
-    store.set('transactions', txs);
+    if (entity === 'transaction') {
+      store.set('transactions', (store.get('transactions') || []).filter((t) => t.id !== id));
+    } else if (entity === 'journal') {
+      store.set('journal', (store.get('journal') || []).filter((e) => e.id !== id));
+    }
   }
 
   async _refreshServices(owner) {

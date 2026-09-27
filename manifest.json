@@ -1,11 +1,11 @@
 {
-  "name": "Nostr Zap Journal",
-  "short_name": "Zap Journal",
-  "description": "Track your Lightning zaps and manage private journal entries on Nostr",
+  "name": "ZapJournal",
+  "short_name": "ZapJournal",
+  "description": "Private journal and Lightning sats tracker on Nostr",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#f7931a",
+  "background_color": "#0B0912",
+  "theme_color": "#0B0912",
   "orientation": "portrait-primary",
   "icons": [
     {
@@ -58,7 +58,7 @@
     }
   ],
   "categories": ["finance", "productivity", "utilities"],
-  "lang": "en",
+  "lang": "lo",
   "dir": "ltr",
   "prefer_related_applications": false
 }

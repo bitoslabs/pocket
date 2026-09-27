@@ -3,36 +3,65 @@
  * Offline support and caching for PWA
  */
 
-const CACHE_NAME = 'zap-journal-v1';
+const CACHE_NAME = 'zap-journal-v6';
 const STATIC_ASSETS = [
-    '/',
-    '/index.html',
-    '/manifest.json',
-    '/css/variables.css',
-    '/css/base.css',
-    '/css/layout.css',
-    '/css/components.css',
-    '/js/app.js',
-    '/js/config.js',
-    '/js/router.js',
-    '/js/core/event-bus.js',
-    '/js/core/state.js',
-    '/js/core/component.js',
-    '/js/services/storage-service.js',
-    '/js/services/auth-service.js',
-    '/js/services/nostr-service.js',
-    '/js/services/zap-service.js',
-    '/js/services/journal-service.js',
-    '/js/utils/dom.js',
-    '/js/utils/format.js',
-    '/js/components/toast.js',
-    '/js/components/modal.js',
-    '/js/components/header.js',
-    '/js/components/sidebar.js',
-    '/js/pages/dashboard.js',
-    '/js/pages/transactions.js',
-    '/js/pages/journal.js',
-    '/js/pages/settings.js'
+    './',
+    'index.html',
+    'manifest.json',
+    'assets/icons/logo-mark.svg',
+    'assets/icons/icon-192.png',
+    'assets/icons/icon-512.png',
+    'css/variables.css',
+    'css/base.css',
+    'css/layout.css',
+    'css/components.css',
+    'js/app.js',
+    'js/config.js',
+    'js/router.js',
+    'js/core/event-bus.js',
+    'js/core/state.js',
+    'js/core/component.js',
+    'js/core/theme.js',
+    'js/core/account.js',
+    'js/core/i18n.js',
+    'js/locales/en.js',
+    'js/locales/th.js',
+    'js/locales/lo.js',
+    'js/services/storage-service.js',
+    'js/services/auth-service.js',
+    'js/services/nostr-service.js',
+    'js/services/profile-service.js',
+    'js/services/zap-service.js',
+    'js/services/journal-service.js',
+    'js/services/category-service.js',
+    'js/services/budget-service.js',
+    'js/services/recurring-service.js',
+    'js/services/price-service.js',
+    'js/services/outbox.js',
+    'js/services/sync-service.js',
+    'js/utils/dom.js',
+    'js/utils/format.js',
+    'js/utils/icons.js',
+    'js/utils/ui.js',
+    'js/components/toast.js',
+    'js/components/modal.js',
+    'js/components/header.js',
+    'js/components/sidebar.js',
+    'js/components/tabbar.js',
+    'js/components/rail.js',
+    'js/components/lock.js',
+    'js/components/quick-add.js',
+    'js/components/tx-modal.js',
+    'js/components/journal-composer.js',
+    'js/components/budgets-modal.js',
+    'js/components/login-modal.js',
+    'js/components/transaction-form.js',
+    'js/components/category-manager.js',
+    'js/pages/dashboard.js',
+    'js/pages/transactions.js',
+    'js/pages/journal.js',
+    'js/pages/settings.js',
+    'js/pages/about.js'
 ];
 
 // Install event - cache static assets
@@ -126,7 +155,7 @@ self.addEventListener('fetch', (event) => {
                     .catch(() => {
                         // Offline fallback for navigation requests
                         if (request.mode === 'navigate') {
-                            return caches.match('/index.html');
+                            return caches.match('index.html');
                         }
                         return new Response('Offline', { status: 503 });
                     });

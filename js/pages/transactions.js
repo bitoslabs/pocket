@@ -1,268 +1,307 @@
 /**
- * Transactions Page
- * Paginated list of all zap events
- * 
+ * Money Page - monthly stats, donut breakdown, budgets, ledger
+ *
  * @module pages/transactions
  */
 
 import { Component } from '../core/component.js';
 import { store } from '../core/state.js';
-import { config } from '../config.js';
-import { zapService } from '../services/zap-service.js';
-import { formatSats, formatDateTime, formatRelativeTime, shortenHex } from '../utils/format.js';
+import { t, locale } from '../core/i18n.js';
+import { budgetService } from '../services/budget-service.js';
+import { categoryService } from '../services/category-service.js';
+import { Icons, hydrateIcons } from '../utils/icons.js';
+import {
+  categoryMeta,
+  dayLabel,
+  fiatLabel,
+  fmtSats,
+  groupByDay,
+  inMonth,
+  isIncome,
+  monthTotals,
+  spentByCat,
+  toMs,
+  txRowHtml,
+} from '../utils/ui.js';
+import { openBudgetsModal } from '../components/budgets-modal.js';
+import { openTxModal } from '../components/tx-modal.js';
+import { openQuickAdd } from '../components/quick-add.js';
 
-export class TransactionsPage extends Component {
-    constructor(options) {
-        super(options);
-        this._state = {
-            page: 1,
-            filter: 'all', // all, income, expense
-            search: '',
-            selectedCategory: null
-        };
-    }
+export class MoneyPage extends Component {
+  constructor(options) {
+    super(options);
+    const now = new Date();
+    this._view = {
+      y: now.getFullYear(),
+      m: now.getMonth(),
+      filter: 'all',
+    };
+  }
 
-    mounted() {
-        this.watchStore('transactions', () => this.render());
-    }
+  mounted() {
+    this.watchStore('transactions', () => this.render());
+    this.watchStore('ui.query', () => this.render());
+    this.watchStore('price', () => this.render());
+    this.watchStore('sync', () => this.render());
+  }
 
-    template() {
-        const { page, filter, search } = this._state;
-        const pageSize = config.ui.pageSize;
+  template() {
+    const { y, m, filter } = this._view;
+    const all = store.get('transactions') || [];
+    const query = store.get('ui.query') || '';
 
-        // Get filtered transactions
-        let transactions = zapService.getTransactions({
-            type: filter === 'all' ? null : filter
-        });
+    const label = new Date(y, m, 1).toLocaleDateString(locale(), {
+      month: 'long',
+      year: 'numeric',
+    });
+    const monthTx = all.filter((t) => inMonth(t.created_at, y, m));
+    const { tin, tout, net } = monthTotals(all, y, m);
+    const spent = spentByCat(all, y, m);
 
-        // Apply search filter
-        if (search) {
-            const searchLower = search.toLowerCase();
-            transactions = transactions.filter(tx =>
-                tx.sender?.toLowerCase().includes(searchLower) ||
-                tx.description?.toLowerCase().includes(searchLower)
-            );
-        }
+    const catSegs = Object.entries(spent)
+      .map(([cat, v]) => ({ cat, v, color: categoryMeta(cat).color }))
+      .sort((a, b) => b.v - a.v);
+    const totalOut = catSegs.reduce((a, s) => a + s.v, 0);
+    const top = catSegs.slice(0, 5);
+    const restV = catSegs.slice(5).reduce((a, s) => a + s.v, 0);
 
-        const total = transactions.length;
-        const totalPages = Math.ceil(total / pageSize);
-        const start = (page - 1) * pageSize;
-        const pageTransactions = transactions.slice(start, start + pageSize);
+    const filtered = monthTx
+      .filter((t) => {
+        if (filter === 'in') return isIncome(t);
+        if (filter === 'out') return !isIncome(t);
+        if (filter.startsWith('cat:')) return t.category === filter.slice(4) && !isIncome(t);
+        return true;
+      })
+      .filter((t) => {
+        if (!query) return true;
+        const meta = categoryMeta(t.category);
+        return (
+          (t.description || '').toLowerCase().includes(query) ||
+          meta.label.toLowerCase().includes(query)
+        );
+      })
+      .sort((a, b) => toMs(b.created_at) - toMs(a.created_at));
 
-        return `
-      <div class="page-header flex justify-between items-start mb-6">
-        <div>
-          <h1 class="text-3xl font-bold">Transactions</h1>
-          <p class="text-secondary mt-2">${total} total transactions</p>
-        </div>
+    const chip = (id, text) =>
+      `<button class="chip ${filter === id ? 'on' : ''}" data-action="mfilter" data-filter="${id}">${text}</button>`;
+
+    const progress = budgetService
+      .getAllBudgetProgress()
+      .sort((a, b) => b.percentage - a.percentage);
+
+    return `
+      <div class="view-title"><span class="ic" style="color:var(--zap)">${Icons.bolt}</span>${t(
+      'money.title'
+    )}</div>
+
+      <div class="month-nav">
+        <button class="mnav-btn" data-action="month" data-d="-1" aria-label="${t(
+          'money.previousMonth'
+        )}">
+          <span class="ic">${Icons.chevL}</span>
+        </button>
+        <span class="mnav-label">${label}</span>
+        <button class="mnav-btn" data-action="month" data-d="1" aria-label="${t(
+          'money.nextMonth'
+        )}">
+          <span class="ic">${Icons.chevR}</span>
+        </button>
       </div>
 
-      <!-- Filters -->
-      <div class="filters-bar card mb-6">
-        <div class="flex flex-wrap gap-4 items-center">
-          <div class="filter-group flex gap-2">
-            <button class="btn ${filter === 'all' ? 'btn-primary' : 'btn-secondary'} btn-sm filter-btn" data-filter="all">
-              All
-            </button>
-            <button class="btn ${filter === 'income' ? 'btn-primary' : 'btn-secondary'} btn-sm filter-btn" data-filter="income">
-              Income
-            </button>
-            <button class="btn ${filter === 'expense' ? 'btn-primary' : 'btn-secondary'} btn-sm filter-btn" data-filter="expense">
-              Expenses
-            </button>
-          </div>
-          
-          <div class="search-box flex-1 min-w-64">
-            <input type="text" class="search-input" placeholder="Search transactions..." value="${this.escape(search)}">
-          </div>
-        </div>
+      <div class="stat-grid">
+        <div class="stat"><b class="vin">${Icons.downLeft}${fmtSats(tin)}</b><span>${t(
+      'money.inThisMonth'
+    )}</span>${
+      fiatLabel(tin) ? `<em class="stat-fiat">${fiatLabel(tin)}</em>` : ''
+    }</div>
+        <div class="stat"><b class="vout">${Icons.upRight}${fmtSats(tout)}</b><span>${t(
+      'money.outThisMonth'
+    )}</span>${
+      fiatLabel(tout) ? `<em class="stat-fiat">${fiatLabel(tout)}</em>` : ''
+    }</div>
+        <div class="stat"><b class="vnet">${net >= 0 ? '+' : '−'}${fmtSats(
+      Math.abs(net)
+    )}</b><span>${t('money.netSats')}</span>${
+      fiatLabel(net) ? `<em class="stat-fiat">${fiatLabel(net)}</em>` : ''
+    }</div>
+        <div class="stat"><b>${monthTx.length}</b><span>${t('money.transactions')}</span></div>
       </div>
 
-      <!-- Transactions List -->
       <div class="card">
-        ${pageTransactions.length > 0
-                ? this._renderTransactionTable(pageTransactions)
-                : this._renderEmpty()}
-        
-        ${totalPages > 1 ? this._renderPagination(page, totalPages, total) : ''}
+        <div class="card-head"><h3>${t('money.incomeVsSpending')}</h3></div>
+        <div class="split">
+          <i class="s-in" style="width:${tin + tout ? Math.round((tin / (tin + tout)) * 100) : 50}%"></i>
+          <i class="s-out" style="flex:1"></i>
+        </div>
+        <div class="split-legend">
+          <span class="li">${t('money.in')} <b>+${fmtSats(tin)}</b></span>
+          <span class="lo">${t('money.out')} <b>−${fmtSats(tout)}</b></span>
+        </div>
       </div>
-    `;
-    }
 
-    _renderTransactionTable(transactions) {
-        return `
-      <div class="table-container overflow-x-auto">
-        <table>
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Amount</th>
-              <th>From/To</th>
-              <th class="hide-mobile">Description</th>
-              <th>Date</th>
-              <th>Category</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${transactions.map(tx => this._renderTransactionRow(tx)).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
-    }
+      ${
+        catSegs.length
+          ? `<div class="card"><div class="card-head"><h3>${t(
+              'money.whereSatsWent'
+            )}</h3></div>
+              <div class="donut-wrap">
+                <div class="donut">
+                  ${this._donut([
+                    ...top,
+                    ...(restV ? [{ v: restV, color: '#3B3550' }] : []),
+                  ])}
+                  <div class="dc"><b>${fmtSats(totalOut)}</b><span>${t('money.spent')}</span></div>
+                </div>
+                <div class="dlegend">
+                  ${top
+                    .map(
+                      (s) =>
+                        `<div class="dl-row"><span class="dl-dot" style="background:${s.color}"></span>
+                          <span class="dl-name">${categoryMeta(s.cat).label}</span>
+                          <b class="dl-amt">${fmtSats(s.v)}</b>
+                          <span class="dl-pct">${Math.round((s.v / totalOut) * 100)}%</span></div>`
+                    )
+                    .join('')}
+                  ${
+                    restV
+                      ? `<div class="dl-row"><span class="dl-dot" style="background:#3B3550"></span>
+                          <span class="dl-name">${t(
+                            'money.other'
+                          )}</span><b class="dl-amt">${fmtSats(restV)}</b>
+                          <span class="dl-pct">${Math.round((restV / totalOut) * 100)}%</span></div>`
+                      : ''
+                  }
+                </div>
+              </div></div>`
+          : `<div class="card"><p class="muted-p">${t('money.noSpending')}</p></div>`
+      }
 
-    _renderTransactionRow(tx) {
-        const amount = formatSats(tx.amount);
-        const isIncome = tx.type === 'income';
-        const date = formatRelativeTime(tx.created_at);
-        const contactDisplay = shortenHex(tx.senderPubkey || '', 6) || 'Anonymous';
-
-        return `
-      <tr class="transaction-row" data-id="${tx.id}">
-        <td>
-          <span class="badge ${isIncome ? 'badge-success' : 'badge-error'}">
-            ${isIncome ? 'IN' : 'OUT'}
-          </span>
-        </td>
-        <td>
-          <span class="font-semibold transaction-amount ${tx.type}">
-            ${isIncome ? '+' : '-'}${amount}
-          </span>
-        </td>
-        <td>
-          <span class="text-sm">${this.escape(contactDisplay)}</span>
-        </td>
-        <td class="hide-mobile">
-          <span class="text-sm text-secondary truncate" style="max-width: 200px; display: block;">
-            ${this.escape(tx.description || '-')}
-          </span>
-        </td>
-        <td>
-          <span class="text-sm text-secondary">${date}</span>
-        </td>
-        <td>
-          <button class="btn btn-ghost btn-sm category-btn" data-id="${tx.id}">
-            ${tx.category
-                ? `<span class="badge badge-primary">${this.escape(tx.category)}</span>`
-                : '<span class="text-tertiary">+ Add</span>'
-            }
-          </button>
-        </td>
-      </tr>
-    `;
-    }
-
-    _renderPagination(currentPage, totalPages, total) {
-        const pages = [];
-        for (let i = 1; i <= totalPages; i++) {
-            if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
-                pages.push(i);
-            } else if (pages[pages.length - 1] !== '...') {
-                pages.push('...');
-            }
+      <div class="card">
+        <div class="card-head"><h3>${t('money.budgets')}</h3>
+          <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" data-action="budgets-open">${t(
+            'money.edit'
+          )}</button>
+        </div>
+        ${
+          progress.length
+            ? progress.map((p) => this._budgetRow(p)).join('')
+            : `<p class="muted-p">${t('money.noBudgets')}</p>`
         }
-
-        return `
-      <div class="pagination flex items-center justify-between p-4 border-t border-color-border">
-        <span class="text-sm text-secondary">
-          Showing ${(currentPage - 1) * config.ui.pageSize + 1} - ${Math.min(currentPage * config.ui.pageSize, total)} of ${total}
-        </span>
-        <div class="pagination-controls flex gap-1">
-          <button class="btn btn-ghost btn-sm page-btn" data-page="${currentPage - 1}" ${currentPage <= 1 ? 'disabled' : ''}>
-            ←
-          </button>
-          ${pages.map(p => p === '...'
-            ? '<span class="px-2 text-tertiary">...</span>'
-            : `<button class="btn ${p === currentPage ? 'btn-primary' : 'btn-ghost'} btn-sm page-btn" data-page="${p}">${p}</button>`
-        ).join('')}
-          <button class="btn btn-ghost btn-sm page-btn" data-page="${currentPage + 1}" ${currentPage >= totalPages ? 'disabled' : ''}>
-            →
-          </button>
-        </div>
       </div>
-    `;
-    }
 
-    _renderEmpty() {
-        return `
-      <div class="empty-state py-12">
-        <div class="empty-state-icon">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-        </div>
-        <h3 class="empty-state-title">No transactions found</h3>
-        <p class="empty-state-description">
-          ${this._state.search || this._state.filter !== 'all'
-                ? 'Try adjusting your filters or search terms.'
-                : 'Connect your Nostr account to see your zap transactions.'}
-        </p>
+      <div class="chips">
+        ${chip('all', t('money.filterAll'))}
+        ${chip('in', t('money.filterIncome'))}
+        ${chip('out', t('money.filterExpense'))}
+        ${catSegs
+          .slice(0, 4)
+          .map((s) => chip('cat:' + s.cat, categoryMeta(s.cat).label))
+          .join('')}
       </div>
+
+      ${
+        filtered.length
+          ? this._groupedLedger(filtered)
+          : `<div class="empty"><div class="empty-ic">${Icons.wallet}</div>
+              <h3>${t('money.nothingHere')}</h3>
+              <p>${query ? t('money.noMatching') : t('money.noActivity')}</p>
+              <button class="btn btn-primary" data-action="log">${t(
+                'money.logSomething'
+              )}</button></div>`
+      }
     `;
-    }
+  }
 
-    bindEvents() {
-        // Filter buttons
-        this.addEventListener('.filter-btn', 'click', (e) => {
-            const filter = e.target.dataset.filter;
-            this.setState({ filter, page: 1 });
-        });
+  _budgetRow(progress) {
+    const { budget, spent, percentage, status } = progress;
+    const cat = categoryService.getCategory(budget.categoryId);
+    const meta = categoryMeta(budget.categoryId);
+    const pct = Math.min(100, Math.round(percentage));
+    const col =
+      status === 'danger' ? 'var(--out)' : status === 'warning' ? 'var(--zap)' : meta.color;
+    const cls = status === 'danger' ? 'over' : status === 'warning' ? 'warn' : '';
+    return `<div class="bud-row"><div class="bud-info">
+      <div class="bud-top"><span>${cat?.name || meta.label}</span>
+        <b class="${cls}">${fmtSats(spent)} / ${fmtSats(budget.amount)}</b></div>
+      <div class="btrack"><i class="bfill" style="width:${spent ? pct : 0}%;background:${col}"></i></div>
+    </div></div>`;
+  }
 
-        // Search input
-        this.addEventListener('.search-input', 'input', (e) => {
-            clearTimeout(this._searchTimeout);
-            this._searchTimeout = setTimeout(() => {
-                this.setState({ search: e.target.value, page: 1 });
-            }, 300);
-        });
+  _groupedLedger(list) {
+    const entries = store.get('journal') || [];
+    const linkedIds = new Set(entries.map((e) => e.linkedTransaction).filter(Boolean));
+    return groupByDay(list)
+      .map(
+        (g) =>
+          `<div class="day-label">${dayLabel(g.items[0].created_at)}</div>
+           <div class="card" style="padding:6px 16px">${g.items
+             .map((t) => txRowHtml(t, linkedIds))
+             .join('')}</div>`
+      )
+      .join('');
+  }
 
-        // Pagination
-        this.addEventListener('.page-btn', 'click', (e) => {
-            const page = parseInt(e.target.dataset.page, 10);
-            if (page) {
-                this.setState({ page });
-            }
-        });
+  _donut(segs) {
+    const size = 150;
+    const stroke = 18;
+    const r = (size - stroke) / 2;
+    const c = 2 * Math.PI * r;
+    const total = segs.reduce((a, s) => a + s.v, 0) || 1;
+    let acc = 0;
+    const circles = segs
+      .map((s) => {
+        const len = (s.v / total) * c;
+        const draw = Math.max(len - 2.5, 0);
+        const el = `<circle r="${r}" cx="${size / 2}" cy="${size / 2}" fill="none"
+          stroke="${s.color}" stroke-width="${stroke}"
+          stroke-dasharray="${draw} ${c - draw}" stroke-dashoffset="${-acc}"
+          transform="rotate(-90 ${size / 2} ${size / 2})"/>`;
+        acc += len;
+        return el;
+      })
+      .join('');
+    return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="max-width:150px">${circles}</svg>`;
+  }
 
-        // Category button
-        this.addEventListener('.category-btn', 'click', async (e) => {
-            const id = e.target.closest('.category-btn').dataset.id;
-            const { modal } = await import('../components/modal.js');
+  bindEvents() {
+    if (this._delegated) return;
+    this._delegated = true;
+    this.addEventListener(this.container, 'click', (e) => {
+      const el = e.target.closest('[data-action]');
+      if (!el || !this.container.contains(el)) return;
+      const action = el.dataset.action;
 
-            // Simple category picker
-            modal.open({
-                title: 'Set Category',
-                content: `
-          <div class="form-group">
-            <label>Category</label>
-            <select id="category-select" class="w-full">
-              <option value="">None</option>
-              <option value="food">Food & Dining</option>
-              <option value="entertainment">Entertainment</option>
-              <option value="services">Services</option>
-              <option value="tips">Tips</option>
-              <option value="donations">Donations</option>
-              <option value="salary">Salary/Income</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-        `,
-                actions: [
-                    { label: 'Cancel', variant: 'btn-secondary' },
-                    {
-                        label: 'Save',
-                        variant: 'btn-primary',
-                        handler: () => {
-                            const select = document.getElementById('category-select');
-                            zapService.updateCategory(id, select.value || null);
-                            this.render();
-                        }
-                    }
-                ]
-            });
-        });
-    }
+      if (action === 'month') {
+        const d = Number(el.dataset.d);
+        let { y, m } = this._view;
+        m += d;
+        if (m < 0) {
+          m = 11;
+          y--;
+        }
+        if (m > 11) {
+          m = 0;
+          y++;
+        }
+        this._view = { ...this._view, y, m };
+        this.render();
+      } else if (action === 'mfilter') {
+        this._view = { ...this._view, filter: el.dataset.filter };
+        this.render();
+      } else if (action === 'budgets-open') {
+        openBudgetsModal({ onSaved: () => this.render() });
+      } else if (action === 'log') {
+        openQuickAdd();
+      } else if (action === 'edit-tx') {
+        const tx = (store.get('transactions') || []).find((t) => t.id === el.dataset.id);
+        if (tx) openTxModal({ tx, onSaved: () => this.render() });
+      }
+    });
+  }
+
+  afterRender() {
+    hydrateIcons(this.container);
+  }
 }
 
-export default TransactionsPage;
+export default MoneyPage;

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="lo" data-lang="lo" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -8,19 +8,12 @@
     />
     <meta
       name="description"
-      content="Track your Lightning zaps and manage private journal entries on Nostr"
+      content="ZapJournal — a private journal and Lightning sats tracker on Nostr"
+      data-i18n-content="common.tagline"
     />
-    <meta
-      name="theme-color"
-      content="#000000"
-      media="(prefers-color-scheme: dark)"
-    />
-    <meta
-      name="theme-color"
-      content="#f2f2f7"
-      media="(prefers-color-scheme: light)"
-    />
+    <meta name="theme-color" content="#0B0912" id="themeColorMeta" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
@@ -28,9 +21,20 @@
 
     <!-- PWA -->
     <link rel="manifest" href="manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="assets/icons/logo-mark.svg" />
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
 
-    <title>Nostr Zap Journal</title>
+    <title>ZapJournal 🔒 — Private Journal & Sats</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Lao font (chanthavong) -->
+    <link rel="stylesheet" href="https://fonts.mts.la/fonts/chanthavong/chanthavong.css" />
 
     <!-- Styles -->
     <link rel="stylesheet" href="css/variables.css" />
@@ -38,84 +42,118 @@
     <link rel="stylesheet" href="css/layout.css" />
     <link rel="stylesheet" href="css/components.css" />
 
-    <style>
-      /* Initial loading state */
-      .app-loading {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        background: var(--color-bg-primary);
-      }
-
-      .app-loading-content {
-        text-align: center;
-      }
-
-      .app-loading-logo {
-        font-size: 4rem;
-        margin-bottom: 1.5rem;
-        animation: pulse 2s ease-in-out infinite;
-      }
-
-      @keyframes pulse {
-        0%,
-        100% {
-          opacity: 1;
-          transform: scale(1);
-        }
-        50% {
-          opacity: 0.7;
-          transform: scale(0.95);
-        }
-      }
-
-      .app-loading-text {
-        font-size: 1.125rem;
-        color: var(--color-text-secondary);
-      }
-
-      /* Hide loading when app is ready */
-      .app-ready .app-loading {
-        display: none;
-      }
-    </style>
+    <!-- Apply saved language + theme before first paint (avoids a flash) -->
+    <script>
+      (function () {
+        try {
+          var lang = localStorage.getItem("app_lang");
+          var supported = ["lo", "th", "en"];
+          if (!supported.includes(lang)) lang = "lo";
+          document.documentElement.setAttribute("lang", lang);
+          document.documentElement.setAttribute("data-lang", lang);
+        } catch (e) {}
+        try {
+          var raw = localStorage.getItem("app_theme");
+          var t = raw ? raw.replace(/"/g, "") : null;
+          if (t === "light" || t === "dark") {
+            document.documentElement.setAttribute("data-theme", t);
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
-    <!-- Loading State -->
-    <div class="app-loading" id="app-loading">
-      <div class="app-loading-content">
-        <div class="app-loading-logo">⚡</div>
-        <p class="app-loading-text">Loading Zap Journal...</p>
+    <div class="bg"></div>
+
+    <!-- PWA Loading Screen -->
+    <div
+      class="app-loader"
+      id="app-loading"
+      role="status"
+      aria-live="polite"
+      data-i18n-aria-label="loader.aria"
+    >
+      <div class="loader-stage">
+        <span class="loader-orbit" aria-hidden="true"><i></i></span>
+        <span class="loader-ring" aria-hidden="true"></span>
+        <span class="loader-ring loader-ring--inner" aria-hidden="true"></span>
+        <div class="loader-mark">
+          <span class="loader-shine" aria-hidden="true"></span>
+          <img src="assets/icons/logo-mark.svg" alt="" />
+        </div>
       </div>
+      <div class="loader-brand">
+        <h1>Zap<em>Journal</em></h1>
+        <div class="loader-sub" data-i18n="loader.loading">Loading your private corner…</div>
+      </div>
+      <div class="loader-bar" aria-hidden="true"><span></span></div>
     </div>
 
     <!-- Main Application -->
-    <div class="app" id="app" style="display: none">
-      <!-- Sidebar Overlay for mobile -->
-      <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <div class="app" id="app" hidden>
+      <!-- Sidebar (desktop) -->
+      <aside
+        class="sidebar"
+        id="sidebar"
+        role="navigation"
+        data-i18n-aria-label="nav.mainNavigation"
+        aria-label="Main navigation"
+      ></aside>
 
-      <!-- Sidebar -->
-      <aside class="app-sidebar" role="navigation" aria-label="Main navigation">
-        <!-- Sidebar content mounted by JS -->
-      </aside>
+      <!-- Main column -->
+      <div class="shell">
+        <header class="topbar" id="topbar" role="banner"></header>
+        <main class="app-content" id="app-content" role="main"></main>
+      </div>
 
-      <!-- Main Content Area -->
-      <main class="app-main">
-        <!-- Header -->
-        <header class="app-header" role="banner">
-          <!-- Header content mounted by JS -->
-        </header>
+      <!-- Right rail (wide desktop) -->
+      <aside class="rail" id="rail" data-i18n-aria-label="nav.insights" aria-label="Insights"></aside>
+    </div>
 
-        <!-- Page Content -->
-        <div class="app-content" role="main">
-          <!-- Page content mounted by router -->
-        </div>
-      </main>
+    <!-- Dock (mobile / tablet) -->
+    <nav class="dock" id="dock" data-i18n-aria-label="nav.primaryNavigation" aria-label="Primary navigation"></nav>
 
-      <!-- iOS Tab Bar (mobile) -->
-      <div class="app-tabbar" role="navigation" aria-label="Tab navigation">
-        <!-- Tab bar content mounted by JS -->
+    <!-- Toasts -->
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+
+    <!-- Lock Screen -->
+    <div class="lockscr" id="lockscr" role="dialog" aria-modal="true" hidden>
+      <div class="lock-brand">
+        <span class="lock-mark"><img src="assets/icons/logo-mark.svg" alt="" /></span>
+        <h1>Zap<em>Journal</em></h1>
+      </div>
+      <div class="lock-title" id="lockTitle" data-i18n="lock.createTitle">
+        Create your PIN
+      </div>
+      <div class="lock-sub" id="lockSub" data-i18n="lock.createSub">
+        4 digits · keeps your journal private on this device
+      </div>
+      <div class="pin-dots" id="pinDots">
+        <span class="pdot"></span><span class="pdot"></span
+        ><span class="pdot"></span><span class="pdot"></span>
+      </div>
+      <div class="keypad" id="keypad">
+        <button class="key" data-key="1">1</button>
+        <button class="key" data-key="2">2</button>
+        <button class="key" data-key="3">3</button>
+        <button class="key" data-key="4">4</button>
+        <button class="key" data-key="5">5</button>
+        <button class="key" data-key="6">6</button>
+        <button class="key" data-key="7">7</button>
+        <button class="key" data-key="8">8</button>
+        <button class="key" data-key="9">9</button>
+        <button class="key ghost" aria-hidden="true"></button>
+        <button class="key" data-key="0">0</button>
+        <button class="key" data-key="back" data-i18n-aria-label="lock.delete" aria-label="Delete">
+          <span class="ic" data-icon="back"></span>
+        </button>
+      </div>
+      <div class="lock-foot">
+        <span data-i18n="lock.privateByDesign"
+          >Private by design · data never leaves this device</span
+        ><br />
+        <button id="forgotPin" data-i18n="lock.forgot" hidden>Forgot PIN?</button>
+        <button id="lockCancel" data-i18n="lock.notNow" hidden>Not now</button>
       </div>
     </div>
 
@@ -126,11 +164,37 @@
     <script type="module">
       import app from "./js/app.js";
 
-      // Show app when loaded
+      const reveal = () => {
+        const loading = document.getElementById("app-loading");
+        const appEl = document.getElementById("app");
+
+        if (appEl && appEl.hidden) {
+          appEl.hidden = false;
+          requestAnimationFrame(() =>
+            document.body.classList.add("app-ready")
+          );
+        }
+
+        // Fade the loader out, then remove it from the tree.
+        if (loading && !loading.classList.contains("is-hidden")) {
+          loading.classList.add("is-hidden");
+          const finish = () => {
+            loading.hidden = true;
+          };
+          loading.addEventListener("transitionend", finish, { once: true });
+          setTimeout(finish, 520); // fallback (reduced motion / no transition)
+        }
+      };
+
       window.addEventListener("load", () => {
-        document.getElementById("app-loading").style.display = "none";
-        document.getElementById("app").style.display = "flex";
-        document.body.classList.add("app-ready");
+        // Never leave the user on the loader, even if a relay stalls.
+        const safety = setTimeout(reveal, 6000);
+        Promise.resolve(app.init())
+          .catch((err) => console.error("[App] init failed:", err))
+          .finally(() => {
+            clearTimeout(safety);
+            reveal();
+          });
       });
     </script>
 
@@ -139,7 +203,7 @@
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
           navigator.serviceWorker
-            .register("/service-worker.js")
+            .register(new URL("service-worker.js", document.baseURI))
             .then((registration) => {
               console.log("[SW] Registered:", registration.scope);
             })

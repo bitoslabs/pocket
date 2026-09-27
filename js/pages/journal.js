@@ -1,318 +1,276 @@
 /**
- * Journal Page
- * Private encrypted journal entries
- * 
+ * Journal Page - private timeline of encrypted entries
+ *
  * @module pages/journal
  */
 
 import { Component } from '../core/component.js';
 import { store } from '../core/state.js';
-import { eventBus, Events } from '../core/event-bus.js';
+import { t, locale } from '../core/i18n.js';
 import { journalService } from '../services/journal-service.js';
-import { formatRelativeTime, formatDateTime } from '../utils/format.js';
+import { modal } from '../components/modal.js';
+import { Icons, hydrateIcons } from '../utils/icons.js';
+import {
+  categoryMeta,
+  dayLabel,
+  escapeHtml,
+  fiatLabel,
+  fmtSats,
+  groupByDay,
+  isIncome,
+  moodById,
+  moneyForEntry,
+  toast,
+  toMs,
+} from '../utils/ui.js';
+import { openComposer } from '../components/journal-composer.js';
+import { openTxModal } from '../components/tx-modal.js';
 
 export class JournalPage extends Component {
-    constructor(options) {
-        super(options);
-        this._state = {
-            filter: null,
-            search: '',
-            showForm: false
-        };
-    }
+  mounted() {
+    this.watchStore('journal', () => this.render());
+    this.watchStore('transactions', () => this.render());
+    this.watchStore('ui.query', () => this.render());
+    this.watchStore('isAuthenticated', () => this.render());
+    this.watchStore('price', () => this.render());
+  }
 
-    mounted() {
-        this.watchStore('journal', () => this.render());
-        this.watchStore('isAuthenticated', () => this.render());
-    }
+  template() {
+    const authenticated = store.get('isAuthenticated');
+    const banner = authenticated ? '' : this._guestBanner();
 
-    template() {
-        const isAuthenticated = store.get('isAuthenticated');
+    const query = store.get('ui.query') || '';
+    const all = (store.get('journal') || []).slice().sort(
+      (a, b) => toMs(b.created_at) - toMs(a.created_at)
+    );
+    const entries = all.filter((e) => {
+      if (!query) return true;
+      const hay = `${e.title || ''} ${e.text || ''} ${(this._tagsOf(e) || []).join(' ')}`.toLowerCase();
+      return hay.includes(query);
+    });
 
-        if (!isAuthenticated) {
-            return this._renderAuthRequired();
-        }
-
-        const { filter, search, showForm } = this._state;
-        const entries = journalService.getEntries({ tag: filter, search });
-        const tags = journalService.getTags();
-
-        return `
-      <div class="page-header flex justify-between items-start mb-6">
-        <div>
-          <h1 class="text-3xl font-bold">🔒 Private Journal</h1>
-          <p class="text-secondary mt-2">Encrypted notes stored on Nostr</p>
+    if (!entries.length) {
+      return `
+        <div class="view-title">${t('journal.title')} <span class="priv-pill">${Icons.eyeOff} ${
+        authenticated ? t('journal.private') : t('journal.local')
+      }</span></div>
+        ${banner}
+        <div class="empty">
+          <div class="empty-ic">${Icons.book}</div>
+          <h3>${query ? t('journal.noMatches') : t('journal.startsToday')}</h3>
+          <p>${
+            query ? t('journal.tryDifferentWords') : t('journal.noOneReads')
+          }</p>
+          ${
+            query
+              ? ''
+              : `<button class="btn btn-primary" data-action="new-entry">${t(
+                  'journal.writeFirst'
+                )}</button>`
+          }
         </div>
-        <button class="btn btn-primary new-entry-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          New Entry
+      `;
+    }
+
+    const transactions = store.get('transactions') || [];
+    const groups = groupByDay(entries, (e) => e.created_at);
+
+    return `
+      <div class="view-title">${t('journal.title')} <span class="priv-pill">${Icons.eyeOff} ${
+      authenticated ? t('journal.private') : t('journal.local')
+    }</span></div>
+      ${banner}
+      ${groups
+        .map(
+          (g) =>
+            `<div class="day-label">${dayLabel(g.items[0].created_at)}</div>` +
+            g.items.map((e) => this._entryCard(e, transactions)).join('')
+        )
+        .join('')}
+    `;
+  }
+
+  _guestBanner() {
+    return `
+      <div class="card">
+        <div class="card-head"><h3>${t('journal.localModeTitle')}</h3></div>
+        <p class="muted-p" style="text-align:left;padding:0 0 12px">
+          ${t('journal.localModeBody')}
+        </p>
+        <button class="btn btn-primary btn-block" data-action="connect">${t(
+          'journal.connectButton'
+        )}</button>
+      </div>
+    `;
+  }
+
+  _tagsOf(entry) {
+    if (Array.isArray(entry.tags) && entry.tags.length) return entry.tags;
+    return entry.tag ? [entry.tag] : [];
+  }
+
+  _entryCard(entry, transactions) {
+    const mood = moodById(entry.mood);
+    const money = moneyForEntry(entry, transactions);
+    const long = (entry.text || '').length > 280;
+    const tags = this._tagsOf(entry);
+
+    return `<article class="jentry rise" data-id="${entry.id}">
+      <div class="jentry-top">
+        ${
+          mood
+            ? `<span class="jmood"><span class="je">${mood.emoji}</span>${mood.label}</span>`
+            : '<span class="jmood"></span>'
+        }
+        <span class="jtime">${new Date(toMs(entry.created_at)).toLocaleTimeString(locale(), {
+          hour: 'numeric',
+          minute: '2-digit',
+        })}</span>
+      </div>
+      <p class="jtext">${escapeHtml(entry.text || '')}</p>
+      ${long ? `<button class="more-btn" data-action="expand">${t('common.showMore')}</button>` : ''}
+      ${
+        tags.length
+          ? `<div class="jtags">${tags
+              .map(
+                (t) =>
+                  `<button class="tag" data-action="jtag" data-tag="${escapeHtml(t)}">#${escapeHtml(
+                    t
+                  )}</button>`
+              )
+              .join('')}</div>`
+          : ''
+      }
+      ${
+        money.length
+          ? `<div class="jmoney">${money
+              .map((t) => {
+                const meta = categoryMeta(t.category);
+                const income = isIncome(t);
+                return `<span class="mchip ${income ? 'in' : 'out'}">${Icons.bolt}${
+                  income ? '+' : '−'
+                }${fmtSats(t.amount)}${fiatLabel(t.amount) ? ' · ' + fiatLabel(t.amount) : ''} · ${
+                  meta.label
+                }</span>`;
+              })
+              .join('')}</div>`
+          : ''
+      }
+      <div class="jacts">
+        <button class="act" data-action="entry-edit" data-id="${entry.id}">
+          <span class="ic">${Icons.edit}</span>${t('common.edit')}
+        </button>
+        <button class="act" data-action="attach-money" data-id="${entry.id}">
+          <span class="ic">${Icons.bolt}</span>${t('money.title')}
+        </button>
+        <button class="act danger" data-action="entry-del" data-id="${entry.id}">
+          <span class="ic">${Icons.trash}</span><span class="dl">${t('common.delete')}</span>
         </button>
       </div>
+    </article>`;
+  }
 
-      ${showForm ? this._renderForm() : ''}
+  bindEvents() {
+    if (this._delegated) return;
+    this._delegated = true;
+    this.addEventListener(this.container, 'click', async (e) => {
+      const el = e.target.closest('[data-action]');
+      if (!el || !this.container.contains(el)) return;
+      const action = el.dataset.action;
 
-      <!-- Filters -->
-      <div class="flex gap-4 mb-6 flex-wrap">
-        <div class="search-box flex-1 min-w-64">
-          <input type="text" class="search-input" placeholder="Search entries..." value="${this.escape(search)}">
-        </div>
-        <div class="tag-filters flex gap-2 flex-wrap">
-          <button class="btn ${!filter ? 'btn-primary' : 'btn-secondary'} btn-sm tag-filter-btn" data-tag="">
-            All
-          </button>
-          ${tags.map(t => `
-            <button class="btn ${filter === t.name ? 'btn-primary' : 'btn-secondary'} btn-sm tag-filter-btn" data-tag="${t.name}">
-              ${this._getTagEmoji(t.name)} ${t.name} (${t.count})
-            </button>
-          `).join('')}
-        </div>
-      </div>
-
-      <!-- Entries Grid -->
-      <div class="grid grid-auto-md gap-4">
-        ${entries.length > 0
-                ? entries.map(entry => this._renderEntryCard(entry)).join('')
-                : this._renderEmpty()}
-      </div>
-    `;
-    }
-
-    _renderForm() {
-        return `
-      <div class="card mb-6 entry-form">
-        <div class="card-header">
-          <h3 class="card-title">New Journal Entry</h3>
-          <button class="btn btn-ghost btn-sm close-form-btn">✕</button>
-        </div>
-        <div class="card-body">
-          <div class="form-group">
-            <label for="entry-title">Title</label>
-            <input type="text" id="entry-title" placeholder="Entry title...">
-          </div>
-          <div class="form-group">
-            <label for="entry-text">Content</label>
-            <textarea id="entry-text" rows="6" placeholder="Write your private thoughts..."></textarea>
-          </div>
-          <div class="form-group">
-            <label for="entry-tag">Category</label>
-            <select id="entry-tag">
-              <option value="personal">🏠 Personal</option>
-              <option value="financial">💰 Financial</option>
-              <option value="goals">🎯 Goals</option>
-              <option value="ideas">💡 Ideas</option>
-              <option value="notes">📝 Notes</option>
-            </select>
-          </div>
-        </div>
-        <div class="card-footer flex justify-end gap-3">
-          <button class="btn btn-secondary cancel-btn">Cancel</button>
-          <button class="btn btn-primary save-entry-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-            </svg>
-            Encrypt & Save
-          </button>
-        </div>
-      </div>
-    `;
-    }
-
-    _renderEntryCard(entry) {
-        const date = formatRelativeTime(entry.created_at);
-        const preview = entry.text.length > 150
-            ? entry.text.slice(0, 150) + '...'
-            : entry.text;
-
-        return `
-      <div class="card entry-card" data-id="${entry.id}">
-        <div class="card-header">
-          <div>
-            <h3 class="card-title">${this.escape(entry.title)}</h3>
-            <span class="badge badge-neutral mt-1">
-              ${this._getTagEmoji(entry.tag)} ${entry.tag}
-            </span>
-          </div>
-          <div class="entry-actions flex gap-1">
-            <button class="btn btn-icon btn-ghost view-entry-btn" data-id="${entry.id}" title="View">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-            </button>
-            <button class="btn btn-icon btn-ghost delete-entry-btn" data-id="${entry.id}" title="Delete">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div class="card-body">
-          <p class="text-secondary text-sm">${this.escape(preview)}</p>
-        </div>
-        <div class="card-footer">
-          <span class="text-xs text-tertiary">${date}</span>
-        </div>
-      </div>
-    `;
-    }
-
-    _renderEmpty() {
-        return `
-      <div class="empty-state py-12 col-span-full">
-        <div class="empty-state-icon">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-          </svg>
-        </div>
-        <h3 class="empty-state-title">No journal entries</h3>
-        <p class="empty-state-description">
-          ${this._state.search || this._state.filter
-                ? 'No entries match your search or filter.'
-                : 'Start writing encrypted notes that only you can read.'}
-        </p>
-      </div>
-    `;
-    }
-
-    _renderAuthRequired() {
-        return `
-      <div class="auth-required text-center py-16">
-        <div class="text-6xl mb-6">🔐</div>
-        <h1 class="text-3xl font-bold mb-4">Authentication Required</h1>
-        <p class="text-secondary mb-8">
-          Connect your Nostr account to access encrypted journal entries.
-        </p>
-        <a href="#dashboard" class="btn btn-primary">
-          Go to Dashboard
-        </a>
-      </div>
-    `;
-    }
-
-    _getTagEmoji(tag) {
-        const emojis = {
-            personal: '🏠',
-            financial: '💰',
-            goals: '🎯',
-            ideas: '💡',
-            notes: '📝'
-        };
-        return emojis[tag] || '📝';
-    }
-
-    bindEvents() {
-        // New entry button
-        this.addEventListener('.new-entry-btn', 'click', () => {
-            this.setState({ showForm: true });
+      if (action === 'connect') {
+        const { loginModal } = await import('../components/login-modal.js');
+        loginModal.show();
+      } else if (action === 'new-entry') {
+        openComposer();
+      } else if (action === 'expand') {
+        const card = el.closest('.jentry');
+        const open = card.classList.toggle('open');
+        el.textContent = open ? t('common.showLess') : t('common.showMore');
+      } else if (action === 'jtag') {
+        store.set('ui.query', el.dataset.tag);
+      } else if (action === 'attach-money') {
+        const id = el.dataset.id;
+        openTxModal({
+          dir: 'out',
+          onSaved: (tx) => {
+            if (tx) this._linkMoney(id, tx.id);
+          },
         });
-
-        // Close form
-        this.addEventListener('.close-form-btn', 'click', () => {
-            this.setState({ showForm: false });
+      } else if (action === 'entry-edit') {
+        const entry = (store.get('journal') || []).find((e) => e.id === el.dataset.id);
+        if (entry) this._openEditEntry(entry);
+      } else if (action === 'entry-del') {
+        const id = el.dataset.id;
+        const confirmed = await modal.confirm({
+          title: t('journal.deleteTitle'),
+          message: t('journal.deleteMessage'),
+          confirmText: t('common.delete'),
+          danger: true,
         });
+        if (!confirmed) return;
+        try {
+          await journalService.delete(id);
+          toast(t('journal.entryDeleted'));
+        } catch (err) {
+          toast(err.message || t('journal.couldNotDelete'), 'error');
+        }
+      }
+    });
+  }
 
-        this.addEventListener('.cancel-btn', 'click', () => {
-            this.setState({ showForm: false });
-        });
+  _openEditEntry(entry) {
+    const content = document.createElement('div');
+    content.innerHTML = `
+      <textarea id="editEntryText" class="note-input" rows="6"
+        style="width:100%;min-height:150px;margin-top:8px"
+        placeholder="${t('journal.editPlaceholder')}">${escapeHtml(entry.text || '')}</textarea>
+    `;
 
-        // Save entry
-        this.addEventListener('.save-entry-btn', 'click', async () => {
-            const title = this.$('#entry-title')?.value?.trim();
-            const text = this.$('#entry-text')?.value?.trim();
-            const tag = this.$('#entry-tag')?.value;
-
-            if (!title || !text) {
-                eventBus.emit(Events.TOAST_SHOW, {
-                    type: 'warning',
-                    message: 'Please fill in title and content'
-                });
-                return;
+    modal.open({
+      title: t('journal.editTitle'),
+      content,
+      actions: [
+        { label: t('common.cancel'), variant: 'btn-ghost', handler: () => {} },
+        {
+          label: t('common.save'),
+          variant: 'btn-primary',
+          closeOnClick: false,
+          handler: async () => {
+            const text = content.querySelector('#editEntryText').value.trim();
+            if (!text) {
+              toast(t('journal.writeSomething'), 'error');
+              return false;
             }
-
             try {
-                await journalService.create({ title, text, tag });
-                this.setState({ showForm: false });
-                eventBus.emit(Events.TOAST_SHOW, {
-                    type: 'success',
-                    message: 'Entry encrypted and saved!'
-                });
-            } catch (error) {
-                eventBus.emit(Events.TOAST_SHOW, {
-                    type: 'error',
-                    message: error.message
-                });
+              await journalService.updateEntry(entry.id, {
+                text,
+                title: text.split('\n')[0].slice(0, 60) || t('journal.journalEntry'),
+              });
+              toast(t('journal.entryUpdated'));
+              modal.close();
+            } catch (err) {
+              toast(err.message || t('journal.couldNotUpdate'), 'error');
             }
-        });
+            return false;
+          },
+        },
+      ],
+    });
+  }
 
-        // Search
-        this.addEventListener('.search-input', 'input', (e) => {
-            clearTimeout(this._searchTimeout);
-            this._searchTimeout = setTimeout(() => {
-                this.setState({ search: e.target.value });
-            }, 300);
-        });
-
-        // Tag filter
-        this.addEventListener('.tag-filter-btn', 'click', (e) => {
-            const tag = e.target.dataset.tag || null;
-            this.setState({ filter: tag });
-        });
-
-        // View entry
-        this.addEventListener('.view-entry-btn', 'click', async (e) => {
-            const id = e.target.closest('.view-entry-btn').dataset.id;
-            const entry = journalService.getEntry(id);
-            if (!entry) return;
-
-            const { modal } = await import('../components/modal.js');
-            modal.open({
-                title: entry.title,
-                content: `
-          <div class="mb-4">
-            <span class="badge badge-neutral">${this._getTagEmoji(entry.tag)} ${entry.tag}</span>
-            <span class="text-sm text-tertiary ml-2">${formatDateTime(entry.created_at)}</span>
-          </div>
-          <div class="entry-content" style="white-space: pre-wrap;">
-            ${this.escape(entry.text)}
-          </div>
-        `,
-                actions: [{ label: 'Close', variant: 'btn-secondary' }]
-            });
-        });
-
-        // Delete entry
-        this.addEventListener('.delete-entry-btn', 'click', async (e) => {
-            const id = e.target.closest('.delete-entry-btn').dataset.id;
-            const { modal } = await import('../components/modal.js');
-
-            const confirmed = await modal.confirm({
-                title: 'Delete Entry',
-                message: 'Are you sure you want to delete this journal entry? This action cannot be undone.',
-                confirmText: 'Delete',
-                danger: true
-            });
-
-            if (confirmed) {
-                try {
-                    await journalService.delete(id);
-                    eventBus.emit(Events.TOAST_SHOW, {
-                        type: 'success',
-                        message: 'Entry deleted'
-                    });
-                } catch (error) {
-                    eventBus.emit(Events.TOAST_SHOW, {
-                        type: 'error',
-                        message: error.message
-                    });
-                }
-            }
-        });
+  async _linkMoney(entryId, txId) {
+    try {
+      await journalService.updateEntry(entryId, { linkedTransaction: txId });
+      toast(t('journal.moneyAttached'));
+    } catch (e) {
+      toast(e.message || t('journal.couldNotAttach'), 'error');
     }
+  }
+
+  afterRender() {
+    hydrateIcons(this.container);
+  }
 }
 
 export default JournalPage;

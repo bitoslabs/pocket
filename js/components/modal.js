@@ -7,6 +7,7 @@
 
 import { eventBus, Events } from '../core/event-bus.js';
 import { store } from '../core/state.js';
+import { t } from '../core/i18n.js';
 
 class ModalManager {
     constructor() {
@@ -35,7 +36,7 @@ class ModalManager {
         this._modal.innerHTML = `
       <div class="modal-header">
         <h2 class="modal-title"></h2>
-        <button class="modal-close btn-icon btn-ghost" aria-label="Close modal">
+        <button class="modal-close btn-icon btn-ghost" aria-label="${t('common.close')}">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -67,6 +68,23 @@ class ModalManager {
             }
         });
 
+        // Swipe-down-to-close (mobile sheets)
+        let touchStart = null;
+        this._modal.addEventListener('touchstart', (e) => {
+            touchStart = {
+                y: e.touches[0].clientY,
+                top: this._modal.getBoundingClientRect().top,
+            };
+        }, { passive: true });
+        this._modal.addEventListener('touchend', (e) => {
+            if (!touchStart) return;
+            const dy = e.changedTouches[0].clientY - touchStart.y;
+            if (dy > 90 && touchStart.y - touchStart.top < 60) {
+                this.close();
+            }
+            touchStart = null;
+        }, { passive: true });
+
         // Listen for modal events
         eventBus.on(Events.MODAL_OPEN, (options) => this.open(options));
         eventBus.on(Events.MODAL_CLOSE, () => this.close());
@@ -89,6 +107,9 @@ class ModalManager {
         titleEl.textContent = title;
         this._modal.setAttribute('aria-labelledby', 'modal-title');
         titleEl.id = 'modal-title';
+
+        const closeBtn = this._modal.querySelector('.modal-close');
+        if (closeBtn) closeBtn.setAttribute('aria-label', t('common.close'));
 
         // Set content
         const bodyEl = this._modal.querySelector('.modal-body');
@@ -182,22 +203,22 @@ class ModalManager {
      * @param {Object} options
      * @returns {Promise<boolean>}
      */
-    confirm({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', danger = false }) {
+    confirm({ title, message, confirmText = null, cancelText = null, danger = false }) {
         return new Promise((resolve) => {
             this.open({
                 title,
                 content: `<p>${message}</p>`,
                 actions: [
                     {
-                        label: cancelText,
+                        label: cancelText || t('common.cancel'),
                         variant: 'btn-secondary',
                         handler: () => {
                             resolve(false);
                         }
                     },
                     {
-                        label: confirmText,
-                        variant: danger ? 'btn-primary' : 'btn-primary',
+                        label: confirmText || t('common.confirm'),
+                        variant: danger ? 'btn-danger' : 'btn-primary',
                         handler: () => {
                             resolve(true);
                         }
@@ -213,14 +234,14 @@ class ModalManager {
      * @param {Object} options
      * @returns {Promise<void>}
      */
-    alert({ title, message, buttonText = 'OK' }) {
+    alert({ title, message, buttonText = null }) {
         return new Promise((resolve) => {
             this.open({
                 title,
                 content: `<p>${message}</p>`,
                 actions: [
                     {
-                        label: buttonText,
+                        label: buttonText || t('common.ok'),
                         variant: 'btn-primary',
                         handler: () => resolve()
                     }
@@ -228,6 +249,14 @@ class ModalManager {
                 onClose: () => resolve()
             });
         });
+    }
+
+    /**
+     * Get the modal body element
+     * @returns {HTMLElement}
+     */
+    getContent() {
+        return this._modal.querySelector('.modal-body');
     }
 }
 

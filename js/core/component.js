@@ -6,7 +6,7 @@
  */
 
 import { store } from './state.js';
-import { eventBus } from './event-bus.js';
+import { eventBus, Events } from './event-bus.js';
 
 export class Component {
     /**
@@ -73,6 +73,9 @@ export class Component {
      */
     mount() {
         if (this._isMounted) return;
+
+        // Re-render automatically whenever the UI language changes.
+        this.watchEvent(Events.LANGUAGE_CHANGED, () => this.render());
 
         this.beforeMount();
         this.render();

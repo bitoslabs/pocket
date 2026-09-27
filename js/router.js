@@ -7,6 +7,7 @@
 
 import { eventBus, Events } from './core/event-bus.js';
 import { store } from './core/state.js';
+import { t } from './core/i18n.js';
 
 class Router {
     constructor() {
@@ -15,6 +16,8 @@ class Router {
         this._currentRoute = null;
         this._container = null;
         this._notFound = null;
+        this._currentComponent = null;
+        this._firstRoute = true;
     }
 
     /**
@@ -29,6 +32,13 @@ class Router {
         // Listen for hash changes
         window.addEventListener('hashchange', () => this._handleRouteChange());
 
+        // Keep the document title in the active language
+        eventBus.on(Events.LANGUAGE_CHANGED, () => {
+            const route = this._currentRoute?.route;
+            const title = route?.titleKey ? t(route.titleKey) : route?.title;
+            if (title) document.title = `${title} | ZapJournal`;
+        });
+
         // Handle initial route
         this._handleRouteChange();
     }
@@ -41,8 +51,8 @@ class Router {
      * @param {string} [options.title] - Page title
      * @param {boolean} [options.auth] - Requires authentication
      */
-    register(path, { component, title = '', auth = false }) {
-        this._routes.set(path, { component, title, auth, path });
+    register(path, { component, title = '', titleKey = '', auth = false }) {
+        this._routes.set(path, { component, title, titleKey, auth, path });
     }
 
     /**
@@ -105,7 +115,7 @@ class Router {
      * @private
      */
     _parseHash() {
-        const hash = window.location.hash.slice(1) || 'dashboard';
+        const hash = window.location.hash.slice(1) || 'home';
         const [pathWithParams, queryString] = hash.split('?');
 
         // Parse query params
@@ -193,26 +203,74 @@ class Router {
             return;
         }
 
-        // Update current route
-        this._currentRoute = to;
-        store.set('ui.currentRoute', fullPath);
+        const first = this._firstRoute !== false;
+        this._firstRoute = false;
 
-        // Update page title
-        if (matchedRoute?.title) {
-            document.title = `${matchedRoute.title} | Nostr Zap Journal`;
-        }
+        // Everything that mutates the DOM for this navigation.
+        const apply = () => {
+            // Update current route
+            this._currentRoute = to;
+            store.set('ui.currentRoute', fullPath);
 
-        // Render route component
-        if (matchedRoute) {
-            this._renderRoute(matchedRoute, to);
-        } else if (this._notFound) {
-            this._renderNotFound(to);
+            // Update page title
+            const pageTitle = matchedRoute?.titleKey ? t(matchedRoute.titleKey) : matchedRoute?.title;
+            if (pageTitle) {
+                document.title = `${pageTitle} | ZapJournal`;
+            }
+
+            // Render route component
+            if (matchedRoute) {
+                this._renderRoute(matchedRoute, to);
+            } else if (this._notFound) {
+                this._renderNotFound(to);
+            } else {
+                console.error(`[Router] Route not found: ${fullPath}`);
+            }
+        };
+
+        // Animate the content swap: View Transitions API when available,
+        // otherwise a one-shot CSS enter animation on the container.
+        if (!first && this._canViewTransition()) {
+            try {
+                document.startViewTransition(apply);
+            } catch (e) {
+                apply();
+                this._animateRouteEnter();
+            }
         } else {
-            console.error(`[Router] Route not found: ${fullPath}`);
+            apply();
+            if (!first) this._animateRouteEnter();
         }
 
         // Emit route change event
         eventBus.emit(Events.ROUTE_CHANGED, { to, from });
+    }
+
+    /**
+     * Whether the View Transitions API can be used for this navigation.
+     * @private
+     */
+    _canViewTransition() {
+        return (
+            typeof document.startViewTransition === 'function' &&
+            !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+        );
+    }
+
+    /**
+     * Fallback page-enter animation (re-triggers the CSS animation).
+     * @private
+     */
+    _animateRouteEnter() {
+        const el = this._container;
+        if (!el) return;
+        el.classList.remove('route-enter');
+        // Force reflow so the animation restarts on repeated navigations.
+        void el.offsetWidth;
+        el.classList.add('route-enter');
+        el.addEventListener('animationend', () => el.classList.remove('route-enter'), {
+            once: true
+        });
     }
 
     /**
@@ -227,6 +285,16 @@ class Router {
 
         const { component } = route;
 
+        // Unmount the previous page instance (clears its store subscriptions)
+        if (this._currentComponent && typeof this._currentComponent.unmount === 'function') {
+            try {
+                this._currentComponent.unmount();
+            } catch (e) {
+                console.warn('[Router] Error unmounting previous component:', e);
+            }
+        }
+        this._currentComponent = null;
+
         // Clear previous content
         this._container.innerHTML = '';
 
@@ -238,6 +306,7 @@ class Router {
                     container: this._container,
                     props: context
                 });
+                this._currentComponent = instance;
                 instance.mount();
             } else {
                 // Factory function
@@ -259,6 +328,15 @@ class Router {
 
 // Singleton instance
 export const router = new Router();
+
+/**
+ * Convenience navigation helper: routeTo('money')
+ * @param {string} path
+ * @param {Object} [params]
+ */
+export function routeTo(path, params = {}) {
+    router.navigate(path, params);
+}
 
 // Helper: Create link element with routing
 export function createRouterLink(path, text, className = '') {

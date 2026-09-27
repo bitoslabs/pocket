@@ -7,6 +7,7 @@
 import { Component } from '../core/component.js';
 import { Events } from '../core/event-bus.js';
 import { store } from '../core/state.js';
+import { t } from '../core/i18n.js';
 import { budgetService } from '../services/budget-service.js';
 import { categoryService } from '../services/category-service.js';
 import { hydrateIcons } from '../utils/icons.js';
@@ -39,9 +40,11 @@ export class Rail extends Component {
 
     return `
       <div class="card">
-        <div class="card-head"><h3>Budget watch</h3>${
+        <div class="card-head"><h3>${t('rail.budgetWatch')}</h3>${
           groups.length
-            ? '<button class="btn btn-ghost btn-sm" data-action="open-budgets">Manage</button>'
+            ? `<button class="btn btn-ghost btn-sm" data-action="open-budgets">${t(
+                'rail.manage'
+              )}</button>`
             : ''
         }</div>
         ${
@@ -49,20 +52,22 @@ export class Rail extends Component {
             ? groups
                 .map(
                   (g) => `<div class="bud-group">
-                    <div class="bud-group-head">${g.period}</div>
+                    <div class="bud-group-head">${t('periods.' + g.period)}</div>
                     ${g.rows.map((p) => this._budgetRow(p)).join('')}
                   </div>`
                 )
                 .join('')
-            : '<p class="muted-p">No budgets yet.</p><button class="btn btn-primary btn-block" data-action="open-budgets">Set a budget</button>'
+            : `<p class="muted-p">${t('rail.noBudgets')}</p><button class="btn btn-primary btn-block" data-action="open-budgets">${t(
+                'rail.setBudget'
+              )}</button>`
         }
       </div>
       <div class="card">
-        <div class="card-head"><h3>Recent</h3></div>
+        <div class="card-head"><h3>${t('rail.recent')}</h3></div>
         ${
           recent.length
-            ? recent.map((t) => txRowHtml(t, linkedIds)).join('')
-            : '<p class="muted-p">No activity yet.</p>'
+            ? recent.map((tx) => txRowHtml(tx, linkedIds)).join('')
+            : `<p class="muted-p">${t('rail.noActivity')}</p>`
         }
       </div>
     `;
@@ -90,7 +95,7 @@ export class Rail extends Component {
   bindEvents() {
     if (this._delegated) return;
     this._delegated = true;
-    this.container.addEventListener('click', async (e) => {
+    this.addEventListener(this.container, 'click', async (e) => {
       const budgetBtn = e.target.closest('[data-action="open-budgets"]');
       if (budgetBtn && this.container.contains(budgetBtn)) {
         const { openBudgetsModal } = await import('./budgets-modal.js');

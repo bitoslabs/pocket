@@ -5,6 +5,7 @@
  */
 
 import { modal } from './modal.js';
+import { t } from '../core/i18n.js';
 import { journalService } from '../services/journal-service.js';
 import { zapService } from '../services/zap-service.js';
 import { categoryService } from '../services/category-service.js';
@@ -13,6 +14,7 @@ import { Icons } from '../utils/icons.js';
 import {
   MOODS,
   categoryMeta,
+  moodLabel,
   playFX,
   toast,
 } from '../utils/ui.js';
@@ -44,14 +46,16 @@ export function openComposer({ mood = null, onSaved = null } = {}) {
     MOODS.map(
       (m) =>
         `<button type="button" class="mood-chip ${state.mood === m.id ? 'on' : ''}"
-           data-mood="${m.id}">${m.emoji} ${m.label}</button>`
+           data-mood="${m.id}">${m.emoji} ${moodLabel(m)}</button>`
     ).join('');
 
   const tagChips = () =>
     state.tags
       .map(
-        (t, i) =>
-          `<span class="tchip">#${t}<button type="button" data-remove-tag="${i}" aria-label="Remove">${Icons.x}</button></span>`
+        (tag, i) =>
+          `<span class="tchip">#${tag}<button type="button" data-remove-tag="${i}" aria-label="${t(
+            'composer.removeTag'
+          )}">${Icons.x}</button></span>`
       )
       .join('');
 
@@ -70,28 +74,32 @@ export function openComposer({ mood = null, onSaved = null } = {}) {
 
   content.innerHTML = `
     <textarea id="composeText" maxlength="2000"
-      placeholder="How was your day? What are you grateful for?"></textarea>
+      placeholder="${t('composer.placeholder')}"></textarea>
     <div class="mood-row" id="moodRow">${moodRow()}</div>
     <div class="tag-edit">
       <div id="tagChips" style="display:contents">${tagChips()}</div>
-      <input id="tagInput" placeholder="Add tag, press Enter" autocomplete="off" />
+      <input id="tagInput" placeholder="${t('composer.addTag')}" autocomplete="off" />
     </div>
     <button type="button" class="attach-toggle ${state.attach ? 'on' : ''}" id="attachToggle">
       <span class="ic">${Icons.bolt}</span>
-      <span id="attachLabel">${state.attach ? 'Money attached ⚡' : 'Attach money to this entry'}</span>
+      <span id="attachLabel">${
+        state.attach ? t('composer.attachDone') : t('composer.attachPrompt')
+      }</span>
     </button>
     <div class="attach-box" id="attachBox" ${state.attach ? '' : 'hidden'}>
       <div class="seg">
         <button type="button" id="segOut" class="${state.dir === 'out' ? 'on-out' : ''}">
-          <span class="ic">${Icons.upRight}</span>Spent
+          <span class="ic">${Icons.upRight}</span>${t('composer.spent')}
         </button>
         <button type="button" id="segIn" class="${state.dir === 'in' ? 'on-in' : ''}">
-          <span class="ic">${Icons.downLeft}</span>Received
+          <span class="ic">${Icons.downLeft}</span>${t('composer.received')}
         </button>
       </div>
       <div class="amt-line">
-        <input id="composeAmt" type="number" min="1" inputmode="numeric" placeholder="Amount" autocomplete="off" />
-        <span>sats</span>
+        <input id="composeAmt" type="number" min="1" inputmode="numeric" placeholder="${t(
+          'composer.amount'
+        )}" autocomplete="off" />
+        <span>${t('common.sats')}</span>
       </div>
       <div class="cat-chips" id="attachCats">${catChips()}</div>
     </div>
@@ -134,8 +142,8 @@ export function openComposer({ mood = null, onSaved = null } = {}) {
       state.attach = !state.attach;
       attachToggle.classList.toggle('on', state.attach);
       content.querySelector('#attachLabel').textContent = state.attach
-        ? 'Money attached ⚡'
-        : 'Attach money to this entry';
+        ? t('composer.attachDone')
+        : t('composer.attachPrompt');
       attachBox.hidden = !state.attach;
       return;
     }
@@ -162,8 +170,8 @@ export function openComposer({ mood = null, onSaved = null } = {}) {
       .replace(/^#/, '')
       .replace(/[^a-z0-9_-]/g, '');
     if (!v) return;
-    if (state.tags.includes(v)) return toast('Tag already added', 'warning');
-    if (state.tags.length >= 5) return toast('Max 5 tags', 'warning');
+    if (state.tags.includes(v)) return toast(t('composer.tagAlready'), 'warning');
+    if (state.tags.length >= 5) return toast(t('composer.maxTags'), 'warning');
     state.tags.push(v);
     tagInput.value = '';
     refreshTags();
@@ -171,14 +179,14 @@ export function openComposer({ mood = null, onSaved = null } = {}) {
 
   const actions = [
     {
-      label: 'Save entry',
+      label: t('composer.saveEntry'),
       variant: 'btn-primary',
       closeOnClick: false,
       handler: () => submit(textarea, state, modal, onSaved),
     },
   ];
 
-  modal.open({ title: 'New entry', content, actions });
+  modal.open({ title: t('composer.title'), content, actions });
   setTimeout(() => textarea.focus(), 320);
 }
 
@@ -186,7 +194,7 @@ async function submit(textarea, state, modalMgr, onSaved) {
   if (state.saving) return false;
   const text = textarea.value.trim();
   if (!text) {
-    toast('Write something first ✍️', 'error');
+    toast(t('composer.writeSomething'), 'error');
     return false;
   }
 
@@ -215,7 +223,7 @@ async function submit(textarea, state, modalMgr, onSaved) {
 
     const firstLine = text.split('\n')[0].slice(0, 60);
     await journalService.create({
-      title: firstLine || 'Journal entry',
+      title: firstLine || t('journal.journalEntry'),
       text,
       tag: state.tags[0] || 'personal',
       tags: state.tags,
@@ -225,14 +233,12 @@ async function submit(textarea, state, modalMgr, onSaved) {
 
     modalMgr.close();
     toast(
-      localOnly
-        ? 'Saved on this device — connect to encrypt & sync'
-        : 'Entry saved to your private journal 🔒',
+      localOnly ? t('composer.savedLocal') : t('composer.savedPrivate'),
       localOnly ? 'info' : 'success'
     );
     onSaved?.();
   } catch (err) {
-    toast(err.message || 'Could not save entry', 'error');
+    toast(err.message || t('composer.couldNotSave'), 'error');
   } finally {
     state.saving = false;
   }

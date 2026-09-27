@@ -214,6 +214,20 @@
   color-scheme: dark;
 }
 
+/* ==================== Script-aware fonts ====================
+   Lao uses the "chanthavong" webfont (fonts.mts.la); Thai uses Noto Sans Thai.
+   Swapping the font variables here re-styles the whole app with no JS. */
+html[data-lang="lo"] {
+  --font-family: "chanthavong", "Noto Sans Lao", "Inter", system-ui, sans-serif;
+  --font-family-rounded: "chanthavong", "Space Grotesk", "Inter", system-ui, sans-serif;
+}
+
+html[data-lang="th"] {
+  --font-family: "Noto Sans Thai", "Inter", system-ui, sans-serif;
+  --font-family-rounded: "Noto Sans Thai", "Space Grotesk", "Inter", system-ui,
+    sans-serif;
+}
+
 /* ==================== Light Theme ==================== */
 [data-theme="light"] {
   --bg: #f5f3fb;

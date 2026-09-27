@@ -7,6 +7,7 @@
 
 import { eventBus, Events } from './core/event-bus.js';
 import { store } from './core/state.js';
+import { t } from './core/i18n.js';
 
 class Router {
     constructor() {
@@ -16,6 +17,7 @@ class Router {
         this._container = null;
         this._notFound = null;
         this._currentComponent = null;
+        this._firstRoute = true;
     }
 
     /**
@@ -30,6 +32,13 @@ class Router {
         // Listen for hash changes
         window.addEventListener('hashchange', () => this._handleRouteChange());
 
+        // Keep the document title in the active language
+        eventBus.on(Events.LANGUAGE_CHANGED, () => {
+            const route = this._currentRoute?.route;
+            const title = route?.titleKey ? t(route.titleKey) : route?.title;
+            if (title) document.title = `${title} | ZapJournal`;
+        });
+
         // Handle initial route
         this._handleRouteChange();
     }
@@ -42,8 +51,8 @@ class Router {
      * @param {string} [options.title] - Page title
      * @param {boolean} [options.auth] - Requires authentication
      */
-    register(path, { component, title = '', auth = false }) {
-        this._routes.set(path, { component, title, auth, path });
+    register(path, { component, title = '', titleKey = '', auth = false }) {
+        this._routes.set(path, { component, title, titleKey, auth, path });
     }
 
     /**
@@ -194,26 +203,74 @@ class Router {
             return;
         }
 
-        // Update current route
-        this._currentRoute = to;
-        store.set('ui.currentRoute', fullPath);
+        const first = this._firstRoute !== false;
+        this._firstRoute = false;
 
-        // Update page title
-        if (matchedRoute?.title) {
-            document.title = `${matchedRoute.title} | ZapJournal`;
-        }
+        // Everything that mutates the DOM for this navigation.
+        const apply = () => {
+            // Update current route
+            this._currentRoute = to;
+            store.set('ui.currentRoute', fullPath);
 
-        // Render route component
-        if (matchedRoute) {
-            this._renderRoute(matchedRoute, to);
-        } else if (this._notFound) {
-            this._renderNotFound(to);
+            // Update page title
+            const pageTitle = matchedRoute?.titleKey ? t(matchedRoute.titleKey) : matchedRoute?.title;
+            if (pageTitle) {
+                document.title = `${pageTitle} | ZapJournal`;
+            }
+
+            // Render route component
+            if (matchedRoute) {
+                this._renderRoute(matchedRoute, to);
+            } else if (this._notFound) {
+                this._renderNotFound(to);
+            } else {
+                console.error(`[Router] Route not found: ${fullPath}`);
+            }
+        };
+
+        // Animate the content swap: View Transitions API when available,
+        // otherwise a one-shot CSS enter animation on the container.
+        if (!first && this._canViewTransition()) {
+            try {
+                document.startViewTransition(apply);
+            } catch (e) {
+                apply();
+                this._animateRouteEnter();
+            }
         } else {
-            console.error(`[Router] Route not found: ${fullPath}`);
+            apply();
+            if (!first) this._animateRouteEnter();
         }
 
         // Emit route change event
         eventBus.emit(Events.ROUTE_CHANGED, { to, from });
+    }
+
+    /**
+     * Whether the View Transitions API can be used for this navigation.
+     * @private
+     */
+    _canViewTransition() {
+        return (
+            typeof document.startViewTransition === 'function' &&
+            !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+        );
+    }
+
+    /**
+     * Fallback page-enter animation (re-triggers the CSS animation).
+     * @private
+     */
+    _animateRouteEnter() {
+        const el = this._container;
+        if (!el) return;
+        el.classList.remove('route-enter');
+        // Force reflow so the animation restarts on repeated navigations.
+        void el.offsetWidth;
+        el.classList.add('route-enter');
+        el.addEventListener('animationend', () => el.classList.remove('route-enter'), {
+            once: true
+        });
     }
 
     /**

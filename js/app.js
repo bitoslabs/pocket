@@ -9,6 +9,7 @@ import { config } from './config.js';
 import { eventBus, Events } from './core/event-bus.js';
 import { store } from './core/state.js';
 import { initTheme } from './core/theme.js';
+import { initI18n, t } from './core/i18n.js';
 import { GUEST, filterOwned } from './core/account.js';
 import { router } from './router.js';
 
@@ -63,6 +64,9 @@ class App {
             // Storage first
             await storageService.init();
 
+            // Language (defaults to Lao) + static [data-i18n] nodes
+            initI18n();
+
             // Restore saved theme + accent (dark/Light, colour picker)
             initTheme();
 
@@ -115,7 +119,7 @@ class App {
             console.log('[App] Initialization complete');
         } catch (error) {
             console.error('[App] Initialization error:', error);
-            eventBus.emit(Events.ERROR, { message: 'Failed to initialize application' });
+            eventBus.emit(Events.ERROR, { message: t('errors.initFailed') });
         }
     }
 
@@ -161,11 +165,11 @@ class App {
 
     _setupRouter() {
         router.registerAll({
-            home: { component: HomePage, title: 'Today' },
-            journal: { component: JournalPage, title: 'Journal' },
-            money: { component: MoneyPage, title: 'Money' },
-            profile: { component: ProfilePage, title: 'Profile' },
-            about: { component: AboutPage, title: 'About' },
+            home: { component: HomePage, titleKey: 'nav.today' },
+            journal: { component: JournalPage, titleKey: 'nav.journal' },
+            money: { component: MoneyPage, titleKey: 'nav.money' },
+            profile: { component: ProfilePage, titleKey: 'nav.profile' },
+            about: { component: AboutPage, titleKey: 'nav.about' },
         });
 
         router.setNotFound(() => {

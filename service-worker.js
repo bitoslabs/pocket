@@ -3,7 +3,7 @@
  * Offline support and caching for PWA
  */
 
-const CACHE_NAME = 'zap-journal-v4';
+const CACHE_NAME = 'zap-journal-v6';
 const STATIC_ASSETS = [
     './',
     'index.html',
@@ -23,6 +23,10 @@ const STATIC_ASSETS = [
     'js/core/component.js',
     'js/core/theme.js',
     'js/core/account.js',
+    'js/core/i18n.js',
+    'js/locales/en.js',
+    'js/locales/th.js',
+    'js/locales/lo.js',
     'js/services/storage-service.js',
     'js/services/auth-service.js',
     'js/services/nostr-service.js',

@@ -5,6 +5,7 @@
  */
 
 import { modal } from './modal.js';
+import { t } from '../core/i18n.js';
 import { Icons } from '../utils/icons.js';
 import { openComposer } from './journal-composer.js';
 import { openTxModal } from './tx-modal.js';
@@ -15,15 +16,15 @@ export function openQuickAdd() {
   content.innerHTML = `
     <button class="qa-row" data-choice="compose">
       <span class="qa-ic ic" style="background:var(--accent-soft);color:var(--accent-2)">${Icons.edit}</span>
-      <span><b>Journal entry</b><span>How was today? Private, just for you</span></span>
+      <span><b>${t('quickAdd.journalTitle')}</b><span>${t('quickAdd.journalSub')}</span></span>
     </button>
     <button class="qa-row" data-choice="out">
       <span class="qa-ic ic" style="background:var(--out-soft);color:var(--out)">${Icons.upRight}</span>
-      <span><b>Log expense</b><span>Money out — food, zaps, bills…</span></span>
+      <span><b>${t('quickAdd.expenseTitle')}</b><span>${t('quickAdd.expenseSub')}</span></span>
     </button>
     <button class="qa-row" data-choice="in">
       <span class="qa-ic ic" style="background:var(--in-soft);color:var(--in)">${Icons.downLeft}</span>
-      <span><b>Log income</b><span>Money in — salary, zaps received…</span></span>
+      <span><b>${t('quickAdd.incomeTitle')}</b><span>${t('quickAdd.incomeSub')}</span></span>
     </button>
   `;
 
@@ -36,7 +37,7 @@ export function openQuickAdd() {
     else openTxModal({ dir: choice });
   });
 
-  modal.open({ title: 'Quick add', content });
+  modal.open({ title: t('quickAdd.title'), content });
 }
 
 export default openQuickAdd;

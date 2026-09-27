@@ -8,6 +8,7 @@
 import { hydrateIcons } from '../utils/icons.js';
 import { eventBus, Events } from '../core/event-bus.js';
 import { store } from '../core/state.js';
+import { t } from '../core/i18n.js';
 
 const PIN_KEY = 'zapjournal.pin.v1';
 
@@ -104,14 +105,14 @@ class Lock {
 
   _render() {
     const titles = {
-      setup: 'Create your PIN',
-      confirm: 'Confirm your PIN',
-      unlock: 'Welcome back',
+      setup: t('lock.createTitle'),
+      confirm: t('lock.confirmTitle'),
+      unlock: t('lock.unlockTitle'),
     };
     const subs = {
-      setup: '4 digits · keeps your journal private on this device',
-      confirm: 'Type it once more to make sure',
-      unlock: 'Enter your PIN to unlock your journal',
+      setup: t('lock.createSub'),
+      confirm: t('lock.confirmSub'),
+      unlock: t('lock.unlockSub'),
     };
     this._titleEl.textContent = titles[this.mode];
     this._subEl.textContent = subs[this.mode];
@@ -156,7 +157,7 @@ class Lock {
         }
         store.set('appLock', true);
         this.hide();
-        this._emit('App lock on 🔒');
+        this._emit(t('lock.appLockOn'));
       } else {
         this._err();
         this.mode = 'setup';
@@ -172,7 +173,7 @@ class Lock {
       }
       if (pinHash(p) === stored) {
         this.hide();
-        this._emit('Unlocked 🔓');
+        this._emit(t('lock.unlocked'));
       } else {
         this._err();
       }
@@ -201,11 +202,11 @@ class Lock {
     }
     b.dataset.armed = '1';
     b.classList.add('armd');
-    b.textContent = 'Tap again to reset PIN';
+    b.textContent = t('lock.tapAgainReset');
     setTimeout(() => {
       b.dataset.armed = '';
       b.classList.remove('armd');
-      b.textContent = 'Forgot PIN?';
+      b.textContent = t('lock.forgot');
     }, 2600);
   }
 

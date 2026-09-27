@@ -6,6 +6,7 @@
 
 import { Component } from '../core/component.js';
 import { store } from '../core/state.js';
+import { t, locale } from '../core/i18n.js';
 import { budgetService } from '../services/budget-service.js';
 import { categoryService } from '../services/category-service.js';
 import { storageService } from '../services/storage-service.js';
@@ -21,6 +22,7 @@ import {
   fmtFull,
   greeting,
   moodById,
+  moodLabel,
   monthTotals,
   toBTC,
   toMs,
@@ -64,28 +66,29 @@ export class HomePage extends Component {
     const linkedIds = new Set(entries.map((e) => e.linkedTransaction).filter(Boolean));
 
     const name = (store.get('user')?.npub || '').slice(0, 6);
-    const helloName = authenticated && name ? name : 'friend';
+    const helloName = authenticated && name ? name : t('dashboard.friend');
 
     const showLocalNotice =
       !authenticated && !storageService.getLocal('app_local_notice_dismissed', false);
 
     return `
       <div class="hi">${greeting()}, ${escapeHtml(helloName)} 👋</div>
-      <div class="hi-sub">${now.toLocaleDateString('en-US', {
+      <div class="hi-sub">${now.toLocaleDateString(locale(), {
         weekday: 'long',
         month: 'long',
         day: 'numeric',
-      })} · your private corner</div>
+      })} · ${t('dashboard.privateCorner')}</div>
 
       ${
         showLocalNotice
           ? `<div class="card local-notice">
-               <div class="card-head"><h3>Local mode</h3>
-                 <button class="btn btn-ghost btn-sm" data-action="dismiss-local">Dismiss</button>
+               <div class="card-head"><h3>${t('dashboard.localModeTitle')}</h3>
+                 <button class="btn btn-ghost btn-sm" data-action="dismiss-local">${t(
+                   'common.dismiss'
+                 )}</button>
                </div>
                <p class="muted-p" style="text-align:left;padding:0 0 12px">
-                 You can use ZapJournal without an account — everything is saved on this device.
-                 Data stays unencrypted until you connect Nostr, and syncs automatically after you log in.
+                 ${t('dashboard.localModeBody')}
                </p>
              </div>`
           : ''
@@ -94,19 +97,23 @@ export class HomePage extends Component {
       ${
         authenticated
           ? ''
-          : `<div class="card"><div class="card-head"><h3>Connect Nostr</h3></div>
+          : `<div class="card"><div class="card-head"><h3>${t('dashboard.connectTitle')}</h3></div>
              <p class="muted-p" style="text-align:left;padding:0 0 12px">
-               Log in to sync your zaps and encrypt journal entries.
+               ${t('dashboard.connectBody')}
              </p>
-             <button class="btn btn-primary btn-block" data-action="connect">Connect with Nostr</button></div>`
+             <button class="btn btn-primary btn-block" data-action="connect">${t(
+               'dashboard.connectButton'
+             )}</button></div>`
       }
 
       <div class="balance">
-        <div class="bal-label">Satoshi balance</div>
-        <div class="bal-num">${fmtFull(balance)}<small>sats</small></div>
+        <div class="bal-label">${t('dashboard.satoshiBalance')}</div>
+        <div class="bal-num">${fmtFull(balance)}<small>${t('common.sats')}</small></div>
         ${
           fiatLabel(balance)
-            ? `<div class="bal-conv">${fmtFull(balance)} sats ~ ${fiatLabel(balance)}</div>`
+            ? `<div class="bal-conv">${fmtFull(balance)} ${t('common.sats')} ~ ${fiatLabel(
+                balance
+              )}</div>`
             : ''
         }
         <div class="bal-btc">${toBTC(balance)}</div>
@@ -114,7 +121,7 @@ export class HomePage extends Component {
           <div class="bal-cell in">
             <span class="ic">${Icons.downLeft}</span>
             <div>
-              <div class="bc-t">In · month</div>
+              <div class="bc-t">${t('dashboard.inMonth')}</div>
               <div class="bc-v">${fmtSats(tin)}</div>
               ${fiatLabel(tin) ? `<div class="bc-f">${fiatLabel(tin)}</div>` : ''}
             </div>
@@ -122,7 +129,7 @@ export class HomePage extends Component {
           <div class="bal-cell">
             <span class="ic">${Icons.upRight}</span>
             <div>
-              <div class="bc-t">Out · month</div>
+              <div class="bc-t">${t('dashboard.outMonth')}</div>
               <div class="bc-v">${fmtSats(tout)}</div>
               ${fiatLabel(tout) ? `<div class="bc-f">${fiatLabel(tout)}</div>` : ''}
             </div>
@@ -134,12 +141,14 @@ export class HomePage extends Component {
         ${
           todayEntry
             ? this._todayEntryCard(todayEntry)
-            : `<h3>How was today?</h3>
-               <p>Your journal is waiting. Pick a mood to begin.</p>
+            : `<h3>${t('dashboard.howWasToday')}</h3>
+               <p>${t('dashboard.journalWaiting')}</p>
                <div class="mood-quick">
                  ${MOODS.map(
                    (m) =>
-                     `<button class="mq" data-action="new-mood" data-mood="${m.id}" title="${m.label}">${m.emoji}</button>`
+                     `<button class="mq" data-action="new-mood" data-mood="${m.id}" title="${moodLabel(
+                       m
+                     )}">${m.emoji}</button>`
                  ).join('')}
                </div>`
         }
@@ -148,8 +157,10 @@ export class HomePage extends Component {
       ${
         topBudgets.length
           ? `<div class="card">
-               <div class="card-head"><h3>Budgets · this month</h3>
-                 <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" data-action="go-money">Money →</button>
+               <div class="card-head"><h3>${t('dashboard.budgetsThisMonth')}</h3>
+                 <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" data-action="go-money">${t(
+                   'dashboard.moneyLink'
+                 )}</button>
                </div>
                ${topBudgets.map((b) => this._budgetRow(b)).join('')}
              </div>`
@@ -157,10 +168,12 @@ export class HomePage extends Component {
       }
 
       <div class="card">
-        <div class="card-head"><h3>Recent activity</h3>
-          <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" data-action="go-money">View all</button>
+        <div class="card-head"><h3>${t('dashboard.recentActivity')}</h3>
+          <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" data-action="go-money">${t(
+            'dashboard.viewAll'
+          )}</button>
         </div>
-        ${recent.map((t) => txRowHtml(t, linkedIds)).join('')}
+        ${recent.map((tx) => txRowHtml(tx, linkedIds)).join('')}
       </div>
     `;
   }
@@ -169,14 +182,16 @@ export class HomePage extends Component {
     const mood = moodById(entry.mood);
     return `
       <div class="card-head" style="margin-bottom:8px">
-        <h3>Today's entry</h3>
-        <span class="priv-pill">${Icons.eyeOff} private</span>
+        <h3>${t('dashboard.todaysEntry')}</h3>
+        <span class="priv-pill">${Icons.eyeOff} ${t('dashboard.private')}</span>
       </div>
       ${mood ? `<div class="jmood"><span class="je">${mood.emoji}</span>${mood.label}</div>` : ''}
       <p class="jtext" style="margin:8px 0 0">${escapeHtml(
         entry.text.slice(0, 180)
       )}${entry.text.length > 180 ? '…' : ''}</p>
-      <button class="btn btn-ghost" style="margin-top:12px" data-action="go-journal">Read in journal →</button>
+      <button class="btn btn-ghost" style="margin-top:12px" data-action="go-journal">${t(
+        'dashboard.readInJournal'
+      )}</button>
     `;
   }
 
@@ -202,7 +217,7 @@ export class HomePage extends Component {
   bindEvents() {
     if (this._delegated) return;
     this._delegated = true;
-    this.container.addEventListener('click', async (e) => {
+    this.addEventListener(this.container, 'click', async (e) => {
       const el = e.target.closest('[data-action]');
       if (!el || !this.container.contains(el)) return;
       const action = el.dataset.action;

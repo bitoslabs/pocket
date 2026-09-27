@@ -10,6 +10,7 @@
 import { Component } from '../core/component.js';
 import { store } from '../core/state.js';
 import { config } from '../config.js';
+import { t } from '../core/i18n.js';
 import {
   fetchProfile,
   lightningAddressOf,
@@ -24,18 +25,18 @@ const NJUMP = 'https://njump.me/';
 const FEATURES = [
   {
     icon: 'lock',
-    title: 'Private journal',
-    text: 'Entries encrypted with NIP-04 and stored as notes-to-self.',
+    titleKey: 'about.featurePrivateTitle',
+    textKey: 'about.featurePrivateText',
   },
   {
     icon: 'bolt',
-    title: 'Sats tracker',
-    text: 'Zap receipts in and out, with budgets, reports and categories.',
+    titleKey: 'about.featureSatsTitle',
+    textKey: 'about.featureSatsText',
   },
   {
     icon: 'download',
-    title: 'Offline & yours',
-    text: 'Installable PWA, local-first, export everything anytime.',
+    titleKey: 'about.featureOfflineTitle',
+    textKey: 'about.featureOfflineText',
   },
 ];
 
@@ -92,7 +93,7 @@ export class AboutPage extends Component {
 
   _personHtml(npub, profile, copyAction) {
     const name =
-      profile?.display_name || profile?.name || (npub ? shortNpub(npub) : 'Anonymous');
+      profile?.display_name || profile?.name || (npub ? shortNpub(npub) : t('profile.anon'));
     const nip05 = String(profile?.nip05 || '').trim();
     const pic = this._safeUrl(profile?.picture);
     const initial = (name[0] || '?').toUpperCase();
@@ -124,12 +125,12 @@ export class AboutPage extends Component {
         <button class="btn btn-outline btn-sm" data-action="${copyAction}" data-copy="${this.escape(
       npub
     )}">
-          <span class="ic">${Icons.copy}</span>Copy npub
+          <span class="ic">${Icons.copy}</span>${t('common.copyNpub')}
         </button>
         <a class="btn btn-ghost btn-sm" href="${NJUMP}${this.escape(
       npub
     )}" target="_blank" rel="noopener noreferrer">
-          <span class="ic">${Icons.external}</span>View on Nostr
+          <span class="ic">${Icons.external}</span>${t('common.viewOnNostr')}
         </a>
       </div>
     `;
@@ -141,17 +142,17 @@ export class AboutPage extends Component {
 
     if (address) {
       return `
-        <p class="about-lead">Support the maintainer with a Lightning zap. No middlemen.</p>
+        <p class="about-lead">${t('about.supportMaintainer')}</p>
         <div class="ln-box">
-          <span class="ln-label">Lightning address</span>
+          <span class="ln-label">${t('about.lightningAddress')}</span>
           <b class="ln-addr">${this.escape(address)}</b>
         </div>
         <div class="about-links">
           <button class="btn btn-primary" data-action="copy-ln" data-copy="${this.escape(address)}">
-            <span class="ic">${Icons.copy}</span>Copy address
+            <span class="ic">${Icons.copy}</span>${t('about.copyAddress')}
           </button>
           <a class="btn btn-outline" href="${this.escape(lightningUri(address))}">
-            <span class="ic">${Icons.zap}</span>Open wallet
+            <span class="ic">${Icons.zap}</span>${t('about.openWallet')}
           </a>
         </div>`;
     }
@@ -159,13 +160,11 @@ export class AboutPage extends Component {
     const loading = this._loading;
     return `
       <p class="about-lead">${
-        loading
-          ? 'Looking up the maintainer’s Lightning address…'
-          : 'No Lightning address is published in the maintainer’s Nostr profile yet.'
+        loading ? t('about.lookingUp') : t('about.noLnAddress')
       }</p>
       <div class="ln-box ${loading ? 'is-loading' : ''}">
-        <span class="ln-label">Owner</span>
-        <b class="ln-addr">${loading ? 'Resolving…' : this.escape(shortNpub(owner))}</b>
+        <span class="ln-label">${t('about.owner')}</span>
+        <b class="ln-addr">${loading ? t('about.resolving') : this.escape(shortNpub(owner))}</b>
       </div>
       <div class="about-links">
         ${
@@ -174,18 +173,18 @@ export class AboutPage extends Component {
             : `<button class="btn btn-outline btn-sm" data-action="copy-owner" data-copy="${this.escape(
                 owner
               )}">
-                 <span class="ic">${Icons.copy}</span>Copy npub
+                 <span class="ic">${Icons.copy}</span>${t('common.copyNpub')}
                </button>`
         }
         <a class="btn btn-ghost btn-sm" href="${NJUMP}${this.escape(
       owner
     )}" target="_blank" rel="noopener noreferrer">
-          <span class="ic">${Icons.zap}</span>Zap on Nostr
+          <span class="ic">${Icons.zap}</span>${t('about.zapOnNostr')}
         </a>
         <button class="btn btn-ghost btn-sm" data-action="refresh-ln" ${
           loading ? 'disabled' : ''
         }>
-          <span class="ic">${Icons.spark}</span>Retry
+          <span class="ic">${Icons.spark}</span>${t('common.retry')}
         </button>
       </div>`;
   }
@@ -198,14 +197,13 @@ export class AboutPage extends Component {
     };
 
     return `
-      <div class="view-title"><span class="ic">${Icons.info}</span>About</div>
+      <div class="view-title"><span class="ic">${Icons.info}</span>${t('about.title')}</div>
 
       <div class="card about-hero">
         <span class="about-mark"><img src="assets/icons/logo-mark.svg" alt="" /></span>
         <h2 class="about-name">Zap<em>Journal</em></h2>
         <p class="about-tagline">
-          A private journal and Lightning sats tracker on Nostr.
-          Local-first, self-custodial, yours.
+          ${t('about.tagline')}
         </p>
         <span class="badge badge-neutral">v${this.escape(version)}</span>
         <div class="about-links">
@@ -217,33 +215,39 @@ export class AboutPage extends Component {
           <a class="btn btn-outline" href="${this.escape(
             repository
           )}" target="_blank" rel="noopener noreferrer">
-            <span class="ic">${Icons.code}</span>Source
+            <span class="ic">${Icons.code}</span>${t('about.source')}
           </a>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-head"><h3>What’s inside</h3></div>
+        <div class="card-head"><h3>${t('about.whatsInside')}</h3></div>
         ${FEATURES.map(
           (f) => `<div class="about-feature">
             <span class="ic">${Icons[f.icon] || Icons.info}</span>
-            <span><b>${this.escape(f.title)}</b><span>${this.escape(f.text)}</span></span>
+            <span><b>${this.escape(t(f.titleKey))}</b><span>${this.escape(
+              t(f.textKey)
+            )}</span></span>
           </div>`
         ).join('')}
       </div>
 
       <div class="card">
-        <div class="card-head"><h3>Contributor</h3><span class="badge badge-primary">Core</span></div>
+        <div class="card-head"><h3>${t('about.contributor')}</h3><span class="badge badge-primary">${t(
+      'about.core'
+    )}</span></div>
         ${this._personHtml(config.team.contributor, this._profiles.contributor, 'copy-contributor')}
       </div>
 
       <div class="card about-donate">
-        <div class="card-head"><h3>Donate</h3><span class="badge">${Icons.zap}sats</span></div>
+        <div class="card-head"><h3>${t('about.donate')}</h3><span class="badge">${Icons.zap}${t(
+      'common.sats'
+    )}</span></div>
         ${this._donateHtml()}
       </div>
 
       <p class="muted-p" style="margin-bottom:24px">
-        ZapJournal v${this.escape(version)} · built by bitos.space · MIT-spirited, self-custody forever
+        ZapJournal v${this.escape(version)} · ${t('about.footer')}
       </p>
     `;
   }
@@ -251,22 +255,22 @@ export class AboutPage extends Component {
   bindEvents() {
     if (this._delegated) return;
     this._delegated = true;
-    this.container.addEventListener('click', (e) => {
+    this.addEventListener(this.container, 'click', (e) => {
       const el = e.target.closest('[data-action]');
       if (!el || !this.container.contains(el)) return;
       const action = el.dataset.action;
       const copy = el.dataset.copy || '';
 
       if (action === 'copy-contributor') {
-        if (copy) copyText(copy, 'Contributor npub copied');
+        if (copy) copyText(copy, t('about.copyContributor'));
       } else if (action === 'copy-owner') {
-        if (copy) copyText(copy, 'Owner npub copied');
+        if (copy) copyText(copy, t('about.copyOwner'));
       } else if (action === 'copy-ln') {
-        if (copy) copyText(copy, 'Lightning address copied ⚡');
+        if (copy) copyText(copy, t('about.lnCopied'));
       } else if (action === 'refresh-ln') {
         this._load(true).then(() => {
           if (!lightningAddressOf(this._profiles.owner)) {
-            toast('Still no Lightning address found', 'warning');
+            toast(t('about.stillNoLn'), 'warning');
           }
         });
       }

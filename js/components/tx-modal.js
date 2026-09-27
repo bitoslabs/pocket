@@ -5,6 +5,7 @@
  */
 
 import { modal } from './modal.js';
+import { t } from '../core/i18n.js';
 import { zapService } from '../services/zap-service.js';
 import { categoryService } from '../services/category-service.js';
 import { priceService } from '../services/price-service.js';
@@ -60,27 +61,29 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
   content.innerHTML = `
     <div class="seg" style="margin-top:8px">
       <button type="button" id="txSegOut" class="${segBtnCls('out')}">
-        <span class="ic">${Icons.upRight}</span>Expense
+        <span class="ic">${Icons.upRight}</span>${t('tx.expense')}
       </button>
       <button type="button" id="txSegIn" class="${segBtnCls('in')}">
-        <span class="ic">${Icons.downLeft}</span>Income
+        <span class="ic">${Icons.downLeft}</span>${t('tx.income')}
       </button>
     </div>
     <div class="amt-line">
       <input id="txAmt" type="number" min="0" inputmode="decimal" placeholder="0" autocomplete="off" />
       ${
         fiatOn
-          ? `<button type="button" class="unit-toggle" id="txUnit" aria-label="Switch amount unit">
-               <span data-unit="sats">sats</span>
+          ? `<button type="button" class="unit-toggle" id="txUnit" aria-label="${t(
+              'tx.switchUnit'
+            )}">
+               <span data-unit="sats">${t('common.sats')}</span>
                <span data-unit="fiat">${currency}</span>
              </button>`
-          : `<span>sats</span>`
+          : `<span>${t('common.sats')}</span>`
       }
     </div>
     ${fiatOn ? `<div class="fiat-preview" id="txFiatPreview"></div>` : ''}
     <div class="cat-chips" id="txCats"></div>
     <input id="txNote" class="note-input" style="margin-top:12px"
-      placeholder="Note (optional) — e.g. Ramen with the crew" maxlength="80" autocomplete="off" />
+      placeholder="${t('tx.notePlaceholder')}" maxlength="80" autocomplete="off" />
   `;
 
   const amtInput = content.querySelector('#txAmt');
@@ -114,7 +117,7 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
     const fiat = unit === 'fiat' ? v : priceService.satsToFiat(v);
     fiatPreview.textContent =
       sats > 0 && fiat > 0
-        ? `${fmtSats(sats)} sats ~ ${priceService.formatAmount(fiat, currency)}`
+        ? `${fmtSats(sats)} ${t('common.sats')} ~ ${priceService.formatAmount(fiat, currency)}`
         : '';
   };
 
@@ -176,25 +179,25 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
   const actions = [];
   if (tx) {
     actions.push({
-      label: 'Delete',
+      label: t('common.delete'),
       variant: 'btn-danger',
       closeOnClick: false,
       handler: async () => {
         await zapService.deleteTransaction(tx.id);
-        toast('Transaction deleted');
+        toast(t('tx.transactionDeleted'));
         modal.close();
         onSaved?.();
       },
     });
   }
   actions.push({
-    label: 'Save',
+    label: t('common.save'),
     variant: 'btn-primary',
     closeOnClick: false,
     handler: async () => {
       const amt = amountToSats();
       if (!amt || amt < 1) {
-        toast('Enter an amount first', 'error');
+        toast(t('tx.enterAmount'), 'error');
         return false;
       }
       const note = content.querySelector('#txNote').value.trim();
@@ -216,14 +219,17 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
       try {
         if (tx) {
           await zapService.updateTransaction(tx.id, payload);
-          toast('Transaction updated');
+          toast(t('tx.transactionUpdated'));
         } else {
           const created = await zapService.createManualTransaction(payload);
           if (type === 'income' || state.cat === 'tips' || state.cat === 'zaps') {
             playFX(amt, type === 'income');
           }
           toast(
-            (type === 'income' ? 'Income logged +' : 'Expense logged −') + fmtSats(amt) + ' sats',
+            (type === 'income' ? t('tx.incomeLogged') : t('tx.expenseLogged')) +
+              fmtSats(amt) +
+              ' ' +
+              t('common.sats'),
             'success'
           );
           modal.close();
@@ -233,14 +239,18 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
         modal.close();
         onSaved?.();
       } catch (err) {
-        toast(err.message || 'Could not save transaction', 'error');
+        toast(err.message || t('tx.couldNotSave'), 'error');
       }
       return false;
     },
   });
 
   modal.open({
-    title: tx ? 'Edit transaction' : state.dir === 'in' ? 'Log income' : 'Log expense',
+    title: tx
+      ? t('tx.editTitle')
+      : state.dir === 'in'
+      ? t('tx.logIncome')
+      : t('tx.logExpense'),
     content,
     actions,
   });

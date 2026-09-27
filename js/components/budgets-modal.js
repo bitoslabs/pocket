@@ -5,6 +5,7 @@
  */
 
 import { modal } from './modal.js';
+import { t } from '../core/i18n.js';
 import { budgetService } from '../services/budget-service.js';
 import { categoryService } from '../services/category-service.js';
 import { Icons } from '../utils/icons.js';
@@ -34,7 +35,7 @@ export function openBudgetsModal({ onSaved = null } = {}) {
 
   const actions = [
     {
-      label: 'Save',
+      label: t('common.save'),
       variant: 'btn-primary',
       closeOnClick: false,
       handler: async () => {
@@ -62,17 +63,17 @@ export function openBudgetsModal({ onSaved = null } = {}) {
             }
           }
           modal.close();
-          toast('Budgets saved ✓', 'success');
+          toast(t('budgets.saved'), 'success');
           onSaved?.();
         } catch (err) {
-          toast(err.message || 'Could not save budgets', 'error');
+          toast(err.message || t('budgets.couldNotSave'), 'error');
         }
         return false;
       },
     },
   ];
 
-  modal.open({ title: 'Monthly budgets', content, actions });
+  modal.open({ title: t('budgets.title'), content, actions });
 }
 
 export default openBudgetsModal;

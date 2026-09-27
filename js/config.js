@@ -52,12 +52,19 @@ export const config = {
             USER: 'nostr_user',
             RELAYS: 'nostr_relays',
             THEME: 'app_theme',
+            LANG: 'app_lang',
             TRANSACTIONS: 'zap_transactions',
             JOURNAL: 'journal_entries',
             CATEGORIES: 'categories'
         },
         dbName: 'NostrZapJournalDB',
         dbVersion: 3
+    },
+
+    // Internationalisation
+    i18n: {
+        defaultLanguage: 'lo',
+        languages: ['lo', 'th', 'en']
     },
 
     // UI settings
@@ -120,6 +127,7 @@ Object.freeze(config.team);
 Object.freeze(config.relays);
 Object.freeze(config.kinds);
 Object.freeze(config.storage);
+Object.freeze(config.i18n);
 Object.freeze(config.ui);
 Object.freeze(config.features);
 

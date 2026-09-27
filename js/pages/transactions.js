@@ -6,6 +6,7 @@
 
 import { Component } from '../core/component.js';
 import { store } from '../core/state.js';
+import { t, locale } from '../core/i18n.js';
 import { budgetService } from '../services/budget-service.js';
 import { categoryService } from '../services/category-service.js';
 import { Icons, hydrateIcons } from '../utils/icons.js';
@@ -49,7 +50,7 @@ export class MoneyPage extends Component {
     const all = store.get('transactions') || [];
     const query = store.get('ui.query') || '';
 
-    const label = new Date(y, m, 1).toLocaleDateString('en-US', {
+    const label = new Date(y, m, 1).toLocaleDateString(locale(), {
       month: 'long',
       year: 'numeric',
     });
@@ -89,55 +90,67 @@ export class MoneyPage extends Component {
       .sort((a, b) => b.percentage - a.percentage);
 
     return `
-      <div class="view-title"><span class="ic" style="color:var(--zap)">${Icons.bolt}</span>Money</div>
+      <div class="view-title"><span class="ic" style="color:var(--zap)">${Icons.bolt}</span>${t(
+      'money.title'
+    )}</div>
 
       <div class="month-nav">
-        <button class="mnav-btn" data-action="month" data-d="-1" aria-label="Previous month">
+        <button class="mnav-btn" data-action="month" data-d="-1" aria-label="${t(
+          'money.previousMonth'
+        )}">
           <span class="ic">${Icons.chevL}</span>
         </button>
         <span class="mnav-label">${label}</span>
-        <button class="mnav-btn" data-action="month" data-d="1" aria-label="Next month">
+        <button class="mnav-btn" data-action="month" data-d="1" aria-label="${t(
+          'money.nextMonth'
+        )}">
           <span class="ic">${Icons.chevR}</span>
         </button>
       </div>
 
       <div class="stat-grid">
-        <div class="stat"><b class="vin">${Icons.downLeft}${fmtSats(tin)}</b><span>in · this month</span>${
+        <div class="stat"><b class="vin">${Icons.downLeft}${fmtSats(tin)}</b><span>${t(
+      'money.inThisMonth'
+    )}</span>${
       fiatLabel(tin) ? `<em class="stat-fiat">${fiatLabel(tin)}</em>` : ''
     }</div>
-        <div class="stat"><b class="vout">${Icons.upRight}${fmtSats(tout)}</b><span>out · this month</span>${
+        <div class="stat"><b class="vout">${Icons.upRight}${fmtSats(tout)}</b><span>${t(
+      'money.outThisMonth'
+    )}</span>${
       fiatLabel(tout) ? `<em class="stat-fiat">${fiatLabel(tout)}</em>` : ''
     }</div>
         <div class="stat"><b class="vnet">${net >= 0 ? '+' : '−'}${fmtSats(
       Math.abs(net)
-    )}</b><span>net · sats</span>${
+    )}</b><span>${t('money.netSats')}</span>${
       fiatLabel(net) ? `<em class="stat-fiat">${fiatLabel(net)}</em>` : ''
     }</div>
-        <div class="stat"><b>${monthTx.length}</b><span>transactions</span></div>
+        <div class="stat"><b>${monthTx.length}</b><span>${t('money.transactions')}</span></div>
       </div>
 
       <div class="card">
-        <div class="card-head"><h3>Income vs spending</h3></div>
+        <div class="card-head"><h3>${t('money.incomeVsSpending')}</h3></div>
         <div class="split">
           <i class="s-in" style="width:${tin + tout ? Math.round((tin / (tin + tout)) * 100) : 50}%"></i>
           <i class="s-out" style="flex:1"></i>
         </div>
         <div class="split-legend">
-          <span class="li">in <b>+${fmtSats(tin)}</b></span>
-          <span class="lo">out <b>−${fmtSats(tout)}</b></span>
+          <span class="li">${t('money.in')} <b>+${fmtSats(tin)}</b></span>
+          <span class="lo">${t('money.out')} <b>−${fmtSats(tout)}</b></span>
         </div>
       </div>
 
       ${
         catSegs.length
-          ? `<div class="card"><div class="card-head"><h3>Where the sats went</h3></div>
+          ? `<div class="card"><div class="card-head"><h3>${t(
+              'money.whereSatsWent'
+            )}</h3></div>
               <div class="donut-wrap">
                 <div class="donut">
                   ${this._donut([
                     ...top,
                     ...(restV ? [{ v: restV, color: '#3B3550' }] : []),
                   ])}
-                  <div class="dc"><b>${fmtSats(totalOut)}</b><span>spent</span></div>
+                  <div class="dc"><b>${fmtSats(totalOut)}</b><span>${t('money.spent')}</span></div>
                 </div>
                 <div class="dlegend">
                   ${top
@@ -152,30 +165,34 @@ export class MoneyPage extends Component {
                   ${
                     restV
                       ? `<div class="dl-row"><span class="dl-dot" style="background:#3B3550"></span>
-                          <span class="dl-name">Other</span><b class="dl-amt">${fmtSats(restV)}</b>
+                          <span class="dl-name">${t(
+                            'money.other'
+                          )}</span><b class="dl-amt">${fmtSats(restV)}</b>
                           <span class="dl-pct">${Math.round((restV / totalOut) * 100)}%</span></div>`
                       : ''
                   }
                 </div>
               </div></div>`
-          : `<div class="card"><p class="muted-p">No spending this month yet — the donut is hungry 🍩</p></div>`
+          : `<div class="card"><p class="muted-p">${t('money.noSpending')}</p></div>`
       }
 
       <div class="card">
-        <div class="card-head"><h3>Budgets</h3>
-          <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" data-action="budgets-open">Edit</button>
+        <div class="card-head"><h3>${t('money.budgets')}</h3>
+          <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" data-action="budgets-open">${t(
+            'money.edit'
+          )}</button>
         </div>
         ${
           progress.length
             ? progress.map((p) => this._budgetRow(p)).join('')
-            : '<p class="muted-p">No budgets yet. Tap Edit to set monthly limits.</p>'
+            : `<p class="muted-p">${t('money.noBudgets')}</p>`
         }
       </div>
 
       <div class="chips">
-        ${chip('all', 'All')}
-        ${chip('in', '↓ Income')}
-        ${chip('out', '↑ Expense')}
+        ${chip('all', t('money.filterAll'))}
+        ${chip('in', t('money.filterIncome'))}
+        ${chip('out', t('money.filterExpense'))}
         ${catSegs
           .slice(0, 4)
           .map((s) => chip('cat:' + s.cat, categoryMeta(s.cat).label))
@@ -186,9 +203,11 @@ export class MoneyPage extends Component {
         filtered.length
           ? this._groupedLedger(filtered)
           : `<div class="empty"><div class="empty-ic">${Icons.wallet}</div>
-              <h3>Nothing here</h3>
-              <p>${query ? 'No matching transactions.' : 'No activity this month yet.'}</p>
-              <button class="btn btn-primary" data-action="log">Log something</button></div>`
+              <h3>${t('money.nothingHere')}</h3>
+              <p>${query ? t('money.noMatching') : t('money.noActivity')}</p>
+              <button class="btn btn-primary" data-action="log">${t(
+                'money.logSomething'
+              )}</button></div>`
       }
     `;
   }
@@ -247,7 +266,7 @@ export class MoneyPage extends Component {
   bindEvents() {
     if (this._delegated) return;
     this._delegated = true;
-    this.container.addEventListener('click', (e) => {
+    this.addEventListener(this.container, 'click', (e) => {
       const el = e.target.closest('[data-action]');
       if (!el || !this.container.contains(el)) return;
       const action = el.dataset.action;

@@ -7,6 +7,7 @@
 
 import { Component } from '../core/component.js';
 import { store } from '../core/state.js';
+import { t } from '../core/i18n.js';
 import { Icons, hydrateIcons } from '../utils/icons.js';
 import { escapeHtml } from '../utils/ui.js';
 import { router } from '../router.js';
@@ -38,27 +39,27 @@ export class Header extends Component {
     let label = '';
     let cls = 'ok';
     if (!authed) {
-      label = 'Local only';
+      label = t('header.localOnly');
       cls = 'off';
     } else if (!sync.online) {
-      label = sync.pending > 0 ? `Offline · ${sync.pending}` : 'Offline';
+      label = sync.pending > 0 ? t('header.offlineCount', { n: sync.pending }) : t('header.offline');
       cls = 'off';
     } else if (sync.status === 'syncing') {
-      label = 'Syncing…';
+      label = t('header.syncing');
       cls = 'busy';
     } else if (sync.status === 'error') {
-      label = 'Sync error';
+      label = t('header.syncError');
       cls = 'err';
     } else if (sync.pending > 0) {
-      label = `${sync.pending} pending`;
+      label = t('header.pending', { n: sync.pending });
       cls = 'pending';
     } else {
-      label = 'Synced';
+      label = t('header.synced');
       cls = 'ok';
     }
     const retryable =
       authed && sync.online && (sync.status === 'error' || (sync.pending || 0) > 0);
-    const title = retryable ? 'Tap to sync now' : 'Local-first sync status';
+    const title = retryable ? t('header.tapToSync') : t('header.syncStatus');
     return `<span class="sync-chip ${cls}${retryable ? ' retryable' : ''}" title="${title}">${label}</span>`;
   }
 
@@ -66,31 +67,31 @@ export class Header extends Component {
     const appLock = store.get('appLock');
     const query = store.get('ui.query') || '';
     return `
-      <div class="brand">
+      <a class="brand" href="#home" aria-label="ZapJournal">
         <span class="brand-mark"><img src="assets/icons/logo-mark.svg" alt="" /></span>
         <span class="brand-name">Zap<em>Journal</em></span>
-      </div>
+      </a>
       <div class="search-wrap ${this._searchOpen ? 'open' : ''}" id="searchWrap" role="search">
         <span class="ic">${Icons.search}</span>
-        <input id="searchInput" type="search" placeholder="Search entries, notes, categories…"
-               autocomplete="off" spellcheck="false" aria-label="Search journal and transactions"
+        <input id="searchInput" type="search" placeholder="${t('header.searchPlaceholder')}"
+               autocomplete="off" spellcheck="false" aria-label="${t('header.searchAria')}"
                value="${escapeHtml(query)}" />
-        <button type="button" class="search-clear" id="searchClear" aria-label="Clear search" ${
-          query ? '' : 'hidden'
-        }>
+        <button type="button" class="search-clear" id="searchClear" aria-label="${t(
+          'header.clearSearch'
+        )}" ${query ? '' : 'hidden'}>
           <span class="ic">${Icons.x}</span>
         </button>
       </div>
       <div class="top-actions">
         ${this._syncChip()}
-        <button class="icon-btn search-toggle" id="searchToggle" aria-label="Search" aria-expanded="${
-          this._searchOpen ? 'true' : 'false'
-        }">
+        <button class="icon-btn search-toggle" id="searchToggle" aria-label="${t(
+          'header.search'
+        )}" aria-expanded="${this._searchOpen ? 'true' : 'false'}">
           <span class="ic">${Icons.search}</span>
         </button>
         ${
           appLock
-            ? `<button class="icon-btn" data-action="lock" aria-label="Lock journal">
+            ? `<button class="icon-btn" data-action="lock" aria-label="${t('header.lockJournal')}">
                  <span class="ic">${Icons.lock}</span>
                </button>`
             : ''

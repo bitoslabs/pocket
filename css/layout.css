@@ -34,6 +34,62 @@ body.app-ready .app {
 
 .app-content {
   display: block;
+  /* Page transition target (View Transitions API where supported) */
+  view-transition-name: app-content;
+}
+
+/* Fallback enter animation (no View Transitions support) */
+@keyframes routeEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.app-content.route-enter {
+  animation: routeEnter 300ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+/* View Transitions: animate only the content, keep the shell stable */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-old(app-content) {
+  animation: routeOut 180ms ease both;
+}
+
+::view-transition-new(app-content) {
+  animation: routeIn 320ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+@keyframes routeOut {
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes routeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-content.route-enter {
+    animation: none;
+  }
+  ::view-transition-old(app-content),
+  ::view-transition-new(app-content) {
+    animation: none;
+  }
 }
 
 /* ==================== Top Bar ==================== */
@@ -51,6 +107,24 @@ body.app-ready .app {
   align-items: center;
   gap: 10px;
   flex: 0 1 auto;
+}
+
+/* Brand doubles as a link back to Home */
+a.brand,
+a.side-brand {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+a.brand:hover,
+a.side-brand:hover {
+  opacity: 0.88;
+}
+a.brand:active,
+a.side-brand:active {
+  transform: scale(0.98);
 }
 
 .brand-mark {
@@ -240,6 +314,12 @@ body.app-ready .app {
   cursor: pointer;
   text-align: left;
   width: 100%;
+  transition: background var(--transition-fast), color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.side-link:active {
+  transform: scale(0.99);
 }
 
 .side-link .ic svg {
@@ -377,6 +457,7 @@ body.app-ready .app {
   font-weight: 600;
   cursor: pointer;
   border-radius: 14px;
+  transition: color var(--transition-fast), transform var(--transition-fast);
 }
 
 .dock-btn .ic svg {

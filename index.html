@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="lo" data-lang="lo" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -9,6 +9,7 @@
     <meta
       name="description"
       content="ZapJournal — a private journal and Lightning sats tracker on Nostr"
+      data-i18n-content="common.tagline"
     />
     <meta name="theme-color" content="#0B0912" id="themeColorMeta" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -29,9 +30,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <!-- Lao font (chanthavong) -->
+    <link rel="stylesheet" href="https://fonts.mts.la/fonts/chanthavong/chanthavong.css" />
 
     <!-- Styles -->
     <link rel="stylesheet" href="css/variables.css" />
@@ -39,9 +42,16 @@
     <link rel="stylesheet" href="css/layout.css" />
     <link rel="stylesheet" href="css/components.css" />
 
-    <!-- Apply saved theme before first paint (avoids a flash) -->
+    <!-- Apply saved language + theme before first paint (avoids a flash) -->
     <script>
       (function () {
+        try {
+          var lang = localStorage.getItem("app_lang");
+          var supported = ["lo", "th", "en"];
+          if (!supported.includes(lang)) lang = "lo";
+          document.documentElement.setAttribute("lang", lang);
+          document.documentElement.setAttribute("data-lang", lang);
+        } catch (e) {}
         try {
           var raw = localStorage.getItem("app_theme");
           var t = raw ? raw.replace(/"/g, "") : null;
@@ -61,7 +71,7 @@
       id="app-loading"
       role="status"
       aria-live="polite"
-      aria-label="Loading ZapJournal"
+      data-i18n-aria-label="loader.aria"
     >
       <div class="loader-stage">
         <span class="loader-orbit" aria-hidden="true"><i></i></span>
@@ -74,7 +84,7 @@
       </div>
       <div class="loader-brand">
         <h1>Zap<em>Journal</em></h1>
-        <div class="loader-sub">Loading your private corner…</div>
+        <div class="loader-sub" data-i18n="loader.loading">Loading your private corner…</div>
       </div>
       <div class="loader-bar" aria-hidden="true"><span></span></div>
     </div>
@@ -86,6 +96,7 @@
         class="sidebar"
         id="sidebar"
         role="navigation"
+        data-i18n-aria-label="nav.mainNavigation"
         aria-label="Main navigation"
       ></aside>
 
@@ -96,11 +107,11 @@
       </div>
 
       <!-- Right rail (wide desktop) -->
-      <aside class="rail" id="rail" aria-label="Insights"></aside>
+      <aside class="rail" id="rail" data-i18n-aria-label="nav.insights" aria-label="Insights"></aside>
     </div>
 
     <!-- Dock (mobile / tablet) -->
-    <nav class="dock" id="dock" aria-label="Primary navigation"></nav>
+    <nav class="dock" id="dock" data-i18n-aria-label="nav.primaryNavigation" aria-label="Primary navigation"></nav>
 
     <!-- Toasts -->
     <div class="toasts" id="toasts" aria-live="polite"></div>
@@ -111,8 +122,10 @@
         <span class="lock-mark"><img src="assets/icons/logo-mark.svg" alt="" /></span>
         <h1>Zap<em>Journal</em></h1>
       </div>
-      <div class="lock-title" id="lockTitle">Create your PIN</div>
-      <div class="lock-sub" id="lockSub">
+      <div class="lock-title" id="lockTitle" data-i18n="lock.createTitle">
+        Create your PIN
+      </div>
+      <div class="lock-sub" id="lockSub" data-i18n="lock.createSub">
         4 digits · keeps your journal private on this device
       </div>
       <div class="pin-dots" id="pinDots">
@@ -131,14 +144,16 @@
         <button class="key" data-key="9">9</button>
         <button class="key ghost" aria-hidden="true"></button>
         <button class="key" data-key="0">0</button>
-        <button class="key" data-key="back" aria-label="Delete">
+        <button class="key" data-key="back" data-i18n-aria-label="lock.delete" aria-label="Delete">
           <span class="ic" data-icon="back"></span>
         </button>
       </div>
       <div class="lock-foot">
-        Private by design · data never leaves this device<br />
-        <button id="forgotPin" hidden>Forgot PIN?</button>
-        <button id="lockCancel" hidden>Not now</button>
+        <span data-i18n="lock.privateByDesign"
+          >Private by design · data never leaves this device</span
+        ><br />
+        <button id="forgotPin" data-i18n="lock.forgot" hidden>Forgot PIN?</button>
+        <button id="lockCancel" data-i18n="lock.notNow" hidden>Not now</button>
       </div>
     </div>
 

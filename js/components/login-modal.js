@@ -6,6 +6,7 @@
  */
 
 import { modal } from './modal.js';
+import { t } from '../core/i18n.js';
 import { authService } from '../services/auth-service.js';
 import { eventBus, Events } from '../core/event-bus.js';
 
@@ -29,36 +30,36 @@ export class LoginModal {
                     <div class="flex items-center gap-3">
                         <span class="text-2xl">🔌</span>
                         <div class="text-left">
-                            <div class="font-bold">Browser Extension</div>
-                            <div class="text-xs text-secondary">Alby, nos2x, etc.</div>
+                            <div class="font-bold">${t('login.extension')}</div>
+                            <div class="text-xs text-secondary">${t('login.extensionSub')}</div>
                         </div>
                     </div>
                     <span>→</span>
                 </button>
 
-                <div class="divider text-center text-secondary text-sm my-2">- OR -</div>
+                <div class="divider text-center text-secondary text-sm my-2">${t('login.or')}</div>
 
                 <!-- nsec Login -->
                 <div class="join w-full">
                     <input type="password" 
                            id="nsec-input" 
                            class="input input-bordered join-item w-full" 
-                           placeholder="nsec1... or hex private key"
+                           placeholder="${t('login.nsecPlaceholder')}"
                     />
                     <button class="btn btn-primary join-item" id="login-nsec">
-                        Login
+                        ${t('login.login')}
                     </button>
                 </div>
                 <p class="text-xs text-secondary text-center mb-2">
-                    Start with 'nsec1' or paste your hex key
+                    ${t('login.nsecHint')}
                 </p>
 
-                <div class="divider text-center text-secondary text-sm my-2">- OR -</div>
+                <div class="divider text-center text-secondary text-sm my-2">${t('login.or')}</div>
 
                 <!-- Generate New -->
                 <button class="btn btn-secondary flex items-center justify-center gap-2" id="login-gen">
                     <span>✨</span>
-                    <span>Generate New Account</span>
+                    <span>${t('login.generate')}</span>
                 </button>
             </div>
         `;
@@ -69,7 +70,7 @@ export class LoginModal {
             try {
                 await authService.login();
                 modal.close();
-                eventBus.emit(Events.TOAST_SHOW, { type: 'success', message: 'Connected via extension' });
+                eventBus.emit(Events.TOAST_SHOW, { type: 'success', message: t('login.connectedExt') });
             } catch (err) {
                 // Error already handled/emitted by authService
             }
@@ -84,7 +85,7 @@ export class LoginModal {
             try {
                 await authService.loginWithSecret(nsec);
                 modal.close();
-                eventBus.emit(Events.TOAST_SHOW, { type: 'success', message: 'Logged in with private key' });
+                eventBus.emit(Events.TOAST_SHOW, { type: 'success', message: t('login.loggedInKey') });
             } catch (err) {
                 eventBus.emit(Events.TOAST_SHOW, { type: 'error', message: err.message });
             }
@@ -107,7 +108,7 @@ export class LoginModal {
         });
 
         modal.open({
-            title: 'Connect to Nostr',
+            title: t('login.title'),
             content: content
         });
     }
@@ -116,20 +117,20 @@ export class LoginModal {
         const content = document.createElement('div');
         content.innerHTML = `
             <div class="alert alert-warning mb-4">
-                <h3 class="font-bold">Save your Secret Key!</h3>
-                <p class="text-sm">This is the ONLY time it will be shown. If you lose it, you lose access to this account forever.</p>
+                <h3 class="font-bold">${t('login.saveSecretTitle')}</h3>
+                <p class="text-sm">${t('login.saveSecretBody')}</p>
             </div>
 
             <div class="form-control mb-4">
-                <label class="label"><span class="label-text">Secret Key (nsec)</span></label>
+                <label class="label"><span class="label-text">${t('login.secretKey')}</span></label>
                 <div class="join w-full">
                     <input type="text" readonly value="${user.nsec}" class="input input-bordered join-item w-full font-mono text-sm" id="key-nsec" />
-                    <button class="btn join-item" id="copy-nsec">Copy</button>
+                    <button class="btn join-item" id="copy-nsec">${t('common.copy')}</button>
                 </div>
             </div>
 
             <div class="form-control mb-6">
-                <label class="label"><span class="label-text">Public Key (npub)</span></label>
+                <label class="label"><span class="label-text">${t('login.publicKey')}</span></label>
                 <div class="join w-full">
                     <input type="text" readonly value="${user.npub}" class="input input-bordered join-item w-full font-mono text-sm" />
                 </div>
@@ -140,15 +141,15 @@ export class LoginModal {
             const el = content.querySelector('#key-nsec');
             el.select();
             document.execCommand('copy');
-            eventBus.emit(Events.TOAST_SHOW, { type: 'success', message: 'Copied to clipboard' });
+            eventBus.emit(Events.TOAST_SHOW, { type: 'success', message: t('common.copied') });
         });
 
         modal.open({
-            title: 'New Account Created',
+            title: t('login.newAccountTitle'),
             content: content,
             actions: [
                 {
-                    label: 'I have saved my key',
+                    label: t('login.savedKey'),
                     variant: 'btn-primary',
                     handler: () => true // Close modal
                 }

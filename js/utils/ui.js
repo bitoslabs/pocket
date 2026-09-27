@@ -7,6 +7,7 @@
 
 import { eventBus, Events } from '../core/event-bus.js';
 import { store } from '../core/state.js';
+import { t, locale } from '../core/i18n.js';
 import { priceService } from '../services/price-service.js';
 import { Icons } from './icons.js';
 
@@ -42,7 +43,7 @@ export function fmtTime(ts) {
 }
 
 export function fmtDate(ts, opts = {}) {
-  return new Date(toMs(ts)).toLocaleDateString('en-US', opts);
+  return new Date(toMs(ts)).toLocaleDateString(locale(), opts);
 }
 
 export function dayLabel(ts) {
@@ -52,9 +53,9 @@ export function dayLabel(ts) {
   const dd = new Date(toMs(ts));
   dd.setHours(0, 0, 0, 0);
   const diff = (today - dd) / 864e5;
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Yesterday';
-  return d.toLocaleDateString('en-US', {
+  if (diff === 0) return t('time.today');
+  if (diff === 1) return t('time.yesterday');
+  return d.toLocaleDateString(locale(), {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -141,7 +142,10 @@ const CATEGORY_META = {
 };
 
 export function categoryMeta(id) {
-  return CATEGORY_META[id] || { label: id || 'Other', color: '#7D7396', icon: 'file' };
+  const meta = CATEGORY_META[id] || { label: id || 'Other', color: '#7D7396', icon: 'file' };
+  const key = `categories.${id}`;
+  const label = t(key);
+  return { ...meta, label: label === key ? meta.label : label };
 }
 
 export function categoryIcon(id) {
@@ -162,7 +166,20 @@ export const MOODS = [
   { id: 'tired', emoji: '😴', label: 'Tired' },
 ];
 
-export const moodById = (id) => MOODS.find((m) => m.id === id) || null;
+/** Translated label for a mood id (falls back to the built-in English label). */
+export function moodLabel(mood) {
+  const id = typeof mood === 'string' ? mood : mood?.id;
+  if (!id) return '';
+  const key = `moods.${id}`;
+  const label = t(key);
+  if (label !== key) return label;
+  return MOODS.find((m) => m.id === id)?.label || id;
+}
+
+export const moodById = (id) => {
+  const m = MOODS.find((x) => x.id === id);
+  return m ? { ...m, label: moodLabel(m) } : null;
+};
 
 /* ==================== Toast / FX ==================== */
 
@@ -177,12 +194,12 @@ export function playFX(amount, green = false) {
     <div class="zf-bolt ${green ? 'green' : ''}">${Icons.bolt}</div>
     <div class="zf-amount ${green ? 'green' : ''}">${
     green ? '+' : '−'
-  }${Number(amount).toLocaleString()} sats</div>`;
+  }${Number(amount).toLocaleString()} ${t('common.sats')}</div>`;
   document.body.appendChild(fx);
   setTimeout(() => fx.remove(), 950);
 }
 
-export async function copyText(text, successMessage = 'Copied to clipboard') {
+export async function copyText(text, successMessage = null) {
   let done = false;
   try {
     await navigator.clipboard.writeText(text);
@@ -205,7 +222,8 @@ export async function copyText(text, successMessage = 'Copied to clipboard') {
       /* ignore */
     }
   }
-  toast(done ? successMessage : 'Copy failed', done ? 'success' : 'error');
+  const message = done ? successMessage || t('common.copied') : t('common.copyFailed');
+  toast(message, done ? 'success' : 'error');
 }
 
 export function shortNpub(n = '') {
@@ -221,10 +239,10 @@ export function hueOf(str = '') {
 /* ==================== Rendering helpers ==================== */
 
 export function greeting(hour = new Date().getHours()) {
-  if (hour < 5) return 'Still up';
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (hour < 5) return t('dashboard.greetingStillUp');
+  if (hour < 12) return t('dashboard.greetingMorning');
+  if (hour < 18) return t('dashboard.greetingAfternoon');
+  return t('dashboard.greetingEvening');
 }
 
 /** Render a ledger row. `linkedIds` is an optional Set of transaction ids. */
@@ -242,7 +260,7 @@ export function txRowHtml(tx, linkedIds = null) {
     <div class="tx-body">
       <b>${escapeHtml(tx.description || meta.label)}${pending ? ' <i class="tx-pending" title="Waiting to sync"></i>' : ''}</b>
       <span>${meta.label} · ${fmtTime(tx.created_at)}${
-    linked ? ' · <i class="tx-link">✎ journal</i>' : ''
+    linked ? ` · <i class="tx-link">✎ ${t('journal.title')}</i>` : ''
   }</span>
     </div>
     <span class="tx-amt ${dir}">

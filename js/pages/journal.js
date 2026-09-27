@@ -6,6 +6,7 @@
 
 import { Component } from '../core/component.js';
 import { store } from '../core/state.js';
+import { t, locale } from '../core/i18n.js';
 import { journalService } from '../services/journal-service.js';
 import { modal } from '../components/modal.js';
 import { Icons, hydrateIcons } from '../utils/icons.js';
@@ -50,20 +51,22 @@ export class JournalPage extends Component {
 
     if (!entries.length) {
       return `
-        <div class="view-title">Journal <span class="priv-pill">${Icons.eyeOff} ${
-        authenticated ? 'private' : 'local'
+        <div class="view-title">${t('journal.title')} <span class="priv-pill">${Icons.eyeOff} ${
+        authenticated ? t('journal.private') : t('journal.local')
       }</span></div>
         ${banner}
         <div class="empty">
           <div class="empty-ic">${Icons.book}</div>
-          <h3>${query ? 'No matches' : 'Your journal starts today'}</h3>
+          <h3>${query ? t('journal.noMatches') : t('journal.startsToday')}</h3>
           <p>${
-            query ? 'Try different words.' : 'No one reads this but you. That is the point.'
+            query ? t('journal.tryDifferentWords') : t('journal.noOneReads')
           }</p>
           ${
             query
               ? ''
-              : '<button class="btn btn-primary" data-action="new-entry">Write first entry</button>'
+              : `<button class="btn btn-primary" data-action="new-entry">${t(
+                  'journal.writeFirst'
+                )}</button>`
           }
         </div>
       `;
@@ -73,8 +76,8 @@ export class JournalPage extends Component {
     const groups = groupByDay(entries, (e) => e.created_at);
 
     return `
-      <div class="view-title">Journal <span class="priv-pill">${Icons.eyeOff} ${
-      authenticated ? 'private' : 'local'
+      <div class="view-title">${t('journal.title')} <span class="priv-pill">${Icons.eyeOff} ${
+      authenticated ? t('journal.private') : t('journal.local')
     }</span></div>
       ${banner}
       ${groups
@@ -90,11 +93,13 @@ export class JournalPage extends Component {
   _guestBanner() {
     return `
       <div class="card">
-        <div class="card-head"><h3>Local mode</h3></div>
+        <div class="card-head"><h3>${t('journal.localModeTitle')}</h3></div>
         <p class="muted-p" style="text-align:left;padding:0 0 12px">
-          Entries are saved on this device only. Connect Nostr to encrypt them and sync across devices.
+          ${t('journal.localModeBody')}
         </p>
-        <button class="btn btn-primary btn-block" data-action="connect">Connect with Nostr</button>
+        <button class="btn btn-primary btn-block" data-action="connect">${t(
+          'journal.connectButton'
+        )}</button>
       </div>
     `;
   }
@@ -117,13 +122,13 @@ export class JournalPage extends Component {
             ? `<span class="jmood"><span class="je">${mood.emoji}</span>${mood.label}</span>`
             : '<span class="jmood"></span>'
         }
-        <span class="jtime">${new Date(toMs(entry.created_at)).toLocaleTimeString([], {
+        <span class="jtime">${new Date(toMs(entry.created_at)).toLocaleTimeString(locale(), {
           hour: 'numeric',
           minute: '2-digit',
         })}</span>
       </div>
       <p class="jtext">${escapeHtml(entry.text || '')}</p>
-      ${long ? '<button class="more-btn" data-action="expand">Show more</button>' : ''}
+      ${long ? `<button class="more-btn" data-action="expand">${t('common.showMore')}</button>` : ''}
       ${
         tags.length
           ? `<div class="jtags">${tags
@@ -153,13 +158,13 @@ export class JournalPage extends Component {
       }
       <div class="jacts">
         <button class="act" data-action="entry-edit" data-id="${entry.id}">
-          <span class="ic">${Icons.edit}</span>Edit
+          <span class="ic">${Icons.edit}</span>${t('common.edit')}
         </button>
         <button class="act" data-action="attach-money" data-id="${entry.id}">
-          <span class="ic">${Icons.bolt}</span>Money
+          <span class="ic">${Icons.bolt}</span>${t('money.title')}
         </button>
         <button class="act danger" data-action="entry-del" data-id="${entry.id}">
-          <span class="ic">${Icons.trash}</span><span class="dl">Delete</span>
+          <span class="ic">${Icons.trash}</span><span class="dl">${t('common.delete')}</span>
         </button>
       </div>
     </article>`;
@@ -168,7 +173,7 @@ export class JournalPage extends Component {
   bindEvents() {
     if (this._delegated) return;
     this._delegated = true;
-    this.container.addEventListener('click', async (e) => {
+    this.addEventListener(this.container, 'click', async (e) => {
       const el = e.target.closest('[data-action]');
       if (!el || !this.container.contains(el)) return;
       const action = el.dataset.action;
@@ -181,7 +186,7 @@ export class JournalPage extends Component {
       } else if (action === 'expand') {
         const card = el.closest('.jentry');
         const open = card.classList.toggle('open');
-        el.textContent = open ? 'Show less' : 'Show more';
+        el.textContent = open ? t('common.showLess') : t('common.showMore');
       } else if (action === 'jtag') {
         store.set('ui.query', el.dataset.tag);
       } else if (action === 'attach-money') {
@@ -198,17 +203,17 @@ export class JournalPage extends Component {
       } else if (action === 'entry-del') {
         const id = el.dataset.id;
         const confirmed = await modal.confirm({
-          title: 'Delete entry',
-          message: 'Delete this journal entry? This cannot be undone.',
-          confirmText: 'Delete',
+          title: t('journal.deleteTitle'),
+          message: t('journal.deleteMessage'),
+          confirmText: t('common.delete'),
           danger: true,
         });
         if (!confirmed) return;
         try {
           await journalService.delete(id);
-          toast('Entry deleted');
+          toast(t('journal.entryDeleted'));
         } catch (err) {
-          toast(err.message || 'Could not delete entry', 'error');
+          toast(err.message || t('journal.couldNotDelete'), 'error');
         }
       }
     });
@@ -219,33 +224,33 @@ export class JournalPage extends Component {
     content.innerHTML = `
       <textarea id="editEntryText" class="note-input" rows="6"
         style="width:100%;min-height:150px;margin-top:8px"
-        placeholder="Edit your entry…">${escapeHtml(entry.text || '')}</textarea>
+        placeholder="${t('journal.editPlaceholder')}">${escapeHtml(entry.text || '')}</textarea>
     `;
 
     modal.open({
-      title: 'Edit entry',
+      title: t('journal.editTitle'),
       content,
       actions: [
-        { label: 'Cancel', variant: 'btn-ghost', handler: () => {} },
+        { label: t('common.cancel'), variant: 'btn-ghost', handler: () => {} },
         {
-          label: 'Save',
+          label: t('common.save'),
           variant: 'btn-primary',
           closeOnClick: false,
           handler: async () => {
             const text = content.querySelector('#editEntryText').value.trim();
             if (!text) {
-              toast('Write something first ✍️', 'error');
+              toast(t('journal.writeSomething'), 'error');
               return false;
             }
             try {
               await journalService.updateEntry(entry.id, {
                 text,
-                title: text.split('\n')[0].slice(0, 60) || 'Journal entry',
+                title: text.split('\n')[0].slice(0, 60) || t('journal.journalEntry'),
               });
-              toast('Entry updated');
+              toast(t('journal.entryUpdated'));
               modal.close();
             } catch (err) {
-              toast(err.message || 'Could not update entry', 'error');
+              toast(err.message || t('journal.couldNotUpdate'), 'error');
             }
             return false;
           },
@@ -257,9 +262,9 @@ export class JournalPage extends Component {
   async _linkMoney(entryId, txId) {
     try {
       await journalService.updateEntry(entryId, { linkedTransaction: txId });
-      toast('Money attached to entry ⚡');
+      toast(t('journal.moneyAttached'));
     } catch (e) {
-      toast(e.message || 'Could not attach money', 'error');
+      toast(e.message || t('journal.couldNotAttach'), 'error');
     }
   }
 

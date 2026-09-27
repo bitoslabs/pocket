@@ -156,6 +156,7 @@ export const Events = {
     MODAL_OPEN: 'modal:open',
     MODAL_CLOSE: 'modal:close',
     THEME_CHANGED: 'theme:changed',
+    LANGUAGE_CHANGED: 'language:changed',
     ROUTE_CHANGED: 'route:changed',
 
     // Error events

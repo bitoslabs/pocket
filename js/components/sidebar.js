@@ -6,16 +6,17 @@
 
 import { Component } from '../core/component.js';
 import { store } from '../core/state.js';
+import { t } from '../core/i18n.js';
 import { Icons, hydrateIcons } from '../utils/icons.js';
 import { monthTotals, fmtSats } from '../utils/ui.js';
 import { openQuickAdd } from './quick-add.js';
 
 const NAV = [
-  { id: 'home', label: 'Today', icon: 'home' },
-  { id: 'journal', label: 'Journal', icon: 'book' },
-  { id: 'money', label: 'Money', icon: 'wallet' },
-  { id: 'profile', label: 'Profile', icon: 'user' },
-  { id: 'about', label: 'About', icon: 'info' },
+  { id: 'home', labelKey: 'nav.today', icon: 'home' },
+  { id: 'journal', labelKey: 'nav.journal', icon: 'book' },
+  { id: 'money', labelKey: 'nav.money', icon: 'wallet' },
+  { id: 'profile', labelKey: 'nav.profile', icon: 'user' },
+  { id: 'about', labelKey: 'nav.about', icon: 'info' },
 ];
 
 export class Sidebar extends Component {
@@ -34,27 +35,33 @@ export class Sidebar extends Component {
     );
 
     return `
-      <div class="side-brand">
+      <a class="side-brand" href="#home" aria-label="ZapJournal">
         <span class="brand-mark"><img src="assets/icons/logo-mark.svg" alt="" /></span>
         <span class="brand-name">Zap<em>Journal</em></span>
-      </div>
+      </a>
       <nav class="side-nav">
         ${NAV.map(
           (item) => `
           <a class="side-link nav-link ${current === item.id ? 'on' : ''}"
              href="#${item.id}" data-tab="${item.id}">
-            <span class="ic">${Icons[item.icon]}</span>${item.label}
+            <span class="ic">${Icons[item.icon]}</span>${t(item.labelKey)}
           </a>`
         ).join('')}
       </nav>
       <button class="side-compose" data-action="open-quick">
-        <span class="ic">${Icons.plus}</span>Quick add
+        <span class="ic">${Icons.plus}</span>${t('nav.quickAdd')}
       </button>
       <div class="side-balance" id="sideBalance">
-        <div class="sb-stat"><b class="vin">${Icons.downLeft}${fmtSats(tin)}</b><span>in · month</span></div>
-        <div class="sb-stat"><b class="vout">${Icons.upRight}${fmtSats(tout)}</b><span>out · month</span></div>
+        <div class="sb-stat"><b class="vin">${Icons.downLeft}${fmtSats(tin)}</b><span>${t(
+          'dashboard.inMonth'
+        )}</span></div>
+        <div class="sb-stat"><b class="vout">${Icons.upRight}${fmtSats(tout)}</b><span>${t(
+          'dashboard.outMonth'
+        )}</span></div>
       </div>
-      <div class="side-foot">private · local-first<br><b>n</b> quick add · <b>/</b> search</div>
+      <div class="side-foot">${t('nav.privateLocalFirst')}<br><b>n</b> ${t(
+        'nav.quickAdd'
+      )} · <b>/</b> ${t('header.search')}</div>
     `;
   }
 

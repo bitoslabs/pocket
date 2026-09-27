@@ -15,6 +15,7 @@ class Router {
         this._currentRoute = null;
         this._container = null;
         this._notFound = null;
+        this._currentComponent = null;
     }
 
     /**
@@ -105,7 +106,7 @@ class Router {
      * @private
      */
     _parseHash() {
-        const hash = window.location.hash.slice(1) || 'dashboard';
+        const hash = window.location.hash.slice(1) || 'home';
         const [pathWithParams, queryString] = hash.split('?');
 
         // Parse query params
@@ -199,7 +200,7 @@ class Router {
 
         // Update page title
         if (matchedRoute?.title) {
-            document.title = `${matchedRoute.title} | Nostr Zap Journal`;
+            document.title = `${matchedRoute.title} | ZapJournal`;
         }
 
         // Render route component
@@ -227,6 +228,16 @@ class Router {
 
         const { component } = route;
 
+        // Unmount the previous page instance (clears its store subscriptions)
+        if (this._currentComponent && typeof this._currentComponent.unmount === 'function') {
+            try {
+                this._currentComponent.unmount();
+            } catch (e) {
+                console.warn('[Router] Error unmounting previous component:', e);
+            }
+        }
+        this._currentComponent = null;
+
         // Clear previous content
         this._container.innerHTML = '';
 
@@ -238,6 +249,7 @@ class Router {
                     container: this._container,
                     props: context
                 });
+                this._currentComponent = instance;
                 instance.mount();
             } else {
                 // Factory function
@@ -259,6 +271,15 @@ class Router {
 
 // Singleton instance
 export const router = new Router();
+
+/**
+ * Convenience navigation helper: routeTo('money')
+ * @param {string} path
+ * @param {Object} [params]
+ */
+export function routeTo(path, params = {}) {
+    router.navigate(path, params);
+}
 
 // Helper: Create link element with routing
 export function createRouterLink(path, text, className = '') {

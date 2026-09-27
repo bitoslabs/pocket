@@ -8,14 +8,15 @@
 export const config = {
     // App metadata
     app: {
-        name: 'Nostr Zap Journal',
+        name: 'ZapJournal',
         version: '1.0.0',
-        description: 'Track your Lightning zaps and manage private journal entries'
+        description: 'Private journal and Lightning sats tracker on Nostr'
     },
 
     // Nostr relay configuration
     relays: {
         default: [
+            'wss://nostr-01.yakihonne.com',
             'wss://relay.damus.io',
             'wss://nos.lol',
         ],
@@ -45,7 +46,7 @@ export const config = {
             CATEGORIES: 'categories'
         },
         dbName: 'NostrZapJournalDB',
-        dbVersion: 1
+        dbVersion: 2
     },
 
     // UI settings
@@ -60,7 +61,44 @@ export const config = {
     features: {
         offlineMode: true,
         encryption: true,
-        familyMode: false
+        familyMode: false,
+        manualTransactions: true,
+        recurringTransactions: true,
+        budgetManagement: true,
+        customCategories: true
+    },
+
+    // Transaction settings
+    transactions: {
+        defaultView: 'all', // all, income, expense
+        pageSize: 20,
+        enableRecurring: true,
+        enableCategories: true,
+        enableBudgets: true
+    },
+
+    // Budget settings
+    budgets: {
+        defaultPeriod: 'monthly', // daily, weekly, monthly, yearly
+        defaultAlertThreshold: 0.7, // 70%
+        enableRollover: false,
+        maxBudgets: 50
+    },
+
+    // Category settings
+    categories: {
+        enableCustom: true,
+        maxCustomCategories: 100,
+        defaultIcons: ['🍔', '🚗', '🛍️', '🎮', '📄', '🏥', '📚', '💼', '📈', '💻'],
+        defaultColors: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#52C41A']
+    },
+
+    // Recurring transaction settings
+    recurring: {
+        enableAutoGeneration: true,
+        checkInterval: 3600000, // 1 hour in milliseconds
+        maxOccurrences: 1000,
+        lookaheadDays: 30
     }
 };
 

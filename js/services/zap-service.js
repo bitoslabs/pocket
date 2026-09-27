@@ -10,6 +10,8 @@ import { eventBus, Events } from '../core/event-bus.js';
 import { store } from '../core/state.js';
 import { nostrService } from './nostr-service.js';
 import { storageService } from './storage-service.js';
+import { categoryService } from './category-service.js';
+import { recurringService } from './recurring-service.js';
 
 class ZapService {
     constructor() {
@@ -272,15 +274,270 @@ class ZapService {
      * @param {string} category - New category
      */
     async updateCategory(transactionId, category) {
-        const transactions = store.get('transactions') || [];
+        const transactions = [...(store.get('transactions') || [])];
         const index = transactions.findIndex(t => t.id === transactionId);
 
         if (index >= 0) {
             const updated = { ...transactions[index], category };
             transactions[index] = updated;
-            store.set('transactions', [...transactions]);
+            store.set('transactions', transactions);
             await storageService.put('transactions', updated);
         }
+    }
+
+    /**
+     * Create a manual transaction
+     * @param {Object} transactionData - Transaction data
+     * @returns {Object} Created transaction
+     */
+    async createManualTransaction(transactionData) {
+        const transaction = {
+            id: this._generateTransactionId(),
+            type: transactionData.type || 'expense',
+            amount: parseFloat(transactionData.amount),
+            description: transactionData.description?.trim() || '',
+            category: transactionData.category || null,
+            created_at: transactionData.date || Date.now(),
+            isManual: true,
+            source: transactionData.source || 'manual' // manual, recurring, etc.
+        };
+
+        // Validate transaction data
+        this._validateManualTransaction(transaction);
+
+        try {
+            // Get existing transactions
+            const existing = store.get('transactions') || [];
+
+            // Add to state and storage
+            const updated = [transaction, ...existing].sort((a, b) => b.created_at - a.created_at);
+            store.set('transactions', updated);
+            await storageService.put('transactions', transaction);
+
+            // Emit event
+            eventBus.emit(Events.MANUAL_TRANSACTION_CREATED, { transaction });
+            eventBus.emit(Events.TRANSACTION_ADDED, { transaction });
+
+            return transaction;
+        } catch (error) {
+            console.error('[Zaps] Error creating manual transaction:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Update a transaction
+     * @param {string} transactionId - Transaction ID
+     * @param {Object} updates - Updates to apply
+     * @returns {Object} Updated transaction
+     */
+    async updateTransaction(transactionId, updates) {
+        const transactions = store.get('transactions') || [];
+        const index = transactions.findIndex(t => t.id === transactionId);
+
+        if (index === -1) {
+            throw new Error('Transaction not found');
+        }
+
+        const transaction = { ...transactions[index], ...updates };
+
+        // Validate updated transaction
+        this._validateManualTransaction(transaction);
+
+        try {
+            // Update in state and storage
+            transactions[index] = transaction;
+            store.set('transactions', [...transactions]);
+            await storageService.put('transactions', transaction);
+
+            // Emit event
+            eventBus.emit(Events.TRANSACTION_UPDATED, { transaction });
+
+            return transaction;
+        } catch (error) {
+            console.error('[Zaps] Error updating transaction:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a transaction
+     * @param {string} transactionId - Transaction ID
+     * @returns {boolean} Success status
+     */
+    async deleteTransaction(transactionId) {
+        const transactions = store.get('transactions') || [];
+        const index = transactions.findIndex(t => t.id === transactionId);
+
+        if (index === -1) {
+            throw new Error('Transaction not found');
+        }
+
+        const transaction = transactions[index];
+
+        try {
+            // Remove from storage
+            await storageService.delete('transactions', transactionId);
+
+            // Remove from state
+            transactions.splice(index, 1);
+            store.set('transactions', [...transactions]);
+
+            // Emit event
+            eventBus.emit(Events.TRANSACTION_DELETED, { transactionId, transaction });
+
+            return true;
+        } catch (error) {
+            console.error('[Zaps] Error deleting transaction:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get transactions by category with spending trends
+     * @param {string} categoryId - Category ID
+     * @param {number} days - Number of days to analyze
+     * @returns {Object} Category spending data
+     */
+    getCategoryTrends(categoryId, days = 30) {
+        const startDate = Date.now() - (days * 24 * 60 * 60 * 1000);
+        const transactions = this.getTransactions({
+            category: categoryId,
+            startDate,
+            type: 'expense'
+        });
+
+        const total = transactions.reduce((sum, t) => sum + t.amount, 0);
+        const average = transactions.length > 0 ? total / transactions.length : 0;
+
+        // Group by day
+        const dailySpending = {};
+        transactions.forEach(tx => {
+            const day = new Date(tx.created_at).toDateString();
+            dailySpending[day] = (dailySpending[day] || 0) + tx.amount;
+        });
+
+        return {
+            categoryId,
+            category: categoryService.getCategory(categoryId),
+            total,
+            average,
+            transactionCount: transactions.length,
+            dailyAverage: total / days,
+            dailySpending,
+            trend: this._calculateTrend(Object.values(dailySpending))
+        };
+    }
+
+    /**
+     * Get spending by category for a period
+     * @param {number} days - Number of days to analyze
+     * @returns {Array} Category spending breakdown
+     */
+    getSpendingByCategory(days = 30) {
+        const startDate = Date.now() - (days * 24 * 60 * 60 * 1000);
+        const transactions = this.getTransactions({
+            startDate,
+            type: 'expense'
+        });
+
+        const categorySpending = {};
+        const categories = categoryService.getCategories('expense');
+
+        // Initialize with all categories
+        categories.forEach(cat => {
+            categorySpending[cat.id] = {
+                category: cat,
+                amount: 0,
+                count: 0,
+                percentage: 0
+            };
+        });
+
+        // Aggregate spending
+        transactions.forEach(tx => {
+            if (tx.category && categorySpending[tx.category]) {
+                categorySpending[tx.category].amount += tx.amount;
+                categorySpending[tx.category].count++;
+            } else if (!tx.category) {
+                // Handle uncategorized
+                if (!categorySpending.uncategorized) {
+                    categorySpending.uncategorized = {
+                        category: { id: 'uncategorized', name: 'Uncategorized', icon: '📌', color: '#8C8C8C' },
+                        amount: 0,
+                        count: 0,
+                        percentage: 0
+                    };
+                }
+                categorySpending.uncategorized.amount += tx.amount;
+                categorySpending.uncategorized.count++;
+            }
+        });
+
+        // Calculate percentages
+        const total = Object.values(categorySpending).reduce((sum, cat) => sum + cat.amount, 0);
+        Object.values(categorySpending).forEach(cat => {
+            cat.percentage = total > 0 ? (cat.amount / total) * 100 : 0;
+        });
+
+        // Sort by amount and return as array
+        return Object.values(categorySpending)
+            .filter(cat => cat.amount > 0)
+            .sort((a, b) => b.amount - a.amount);
+    }
+
+    /**
+     * Validate manual transaction data
+     * @private
+     */
+    _validateManualTransaction(transaction) {
+        if (!transaction.amount || transaction.amount <= 0) {
+            throw new Error('Amount must be greater than 0');
+        }
+
+        if (!['income', 'expense'].includes(transaction.type)) {
+            throw new Error('Type must be income or expense');
+        }
+
+        if (transaction.category) {
+            const category = categoryService.getCategory(transaction.category);
+            if (!category) {
+                throw new Error('Invalid category');
+            }
+
+            // Check if category type matches transaction type
+            if (category.type !== 'both' && category.type !== transaction.type) {
+                throw new Error(`Category ${category.name} cannot be used for ${transaction.type} transactions`);
+            }
+        }
+    }
+
+    /**
+     * Calculate trend from array of values
+     * @private
+     */
+    _calculateTrend(values) {
+        if (values.length < 2) return 'stable';
+
+        const firstHalf = values.slice(0, Math.floor(values.length / 2));
+        const secondHalf = values.slice(Math.floor(values.length / 2));
+
+        const firstAvg = firstHalf.reduce((sum, val) => sum + val, 0) / firstHalf.length;
+        const secondAvg = secondHalf.reduce((sum, val) => sum + val, 0) / secondHalf.length;
+
+        const change = ((secondAvg - firstAvg) / firstAvg) * 100;
+
+        if (change > 10) return 'increasing';
+        if (change < -10) return 'decreasing';
+        return 'stable';
+    }
+
+    /**
+     * Generate unique ID for manual transaction
+     * @private
+     */
+    _generateTransactionId() {
+        return 'manual_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
 
     /**

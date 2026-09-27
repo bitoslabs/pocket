@@ -161,6 +161,7 @@ const initialState = {
     isLoading: false,
     error: null,
     theme: 'dark',
+    appLock: false,
 
     // Data
     transactions: [],

@@ -67,6 +67,23 @@ class ModalManager {
             }
         });
 
+        // Swipe-down-to-close (mobile sheets)
+        let touchStart = null;
+        this._modal.addEventListener('touchstart', (e) => {
+            touchStart = {
+                y: e.touches[0].clientY,
+                top: this._modal.getBoundingClientRect().top,
+            };
+        }, { passive: true });
+        this._modal.addEventListener('touchend', (e) => {
+            if (!touchStart) return;
+            const dy = e.changedTouches[0].clientY - touchStart.y;
+            if (dy > 90 && touchStart.y - touchStart.top < 60) {
+                this.close();
+            }
+            touchStart = null;
+        }, { passive: true });
+
         // Listen for modal events
         eventBus.on(Events.MODAL_OPEN, (options) => this.open(options));
         eventBus.on(Events.MODAL_CLOSE, () => this.close());
@@ -197,7 +214,7 @@ class ModalManager {
                     },
                     {
                         label: confirmText,
-                        variant: danger ? 'btn-primary' : 'btn-primary',
+                        variant: danger ? 'btn-danger' : 'btn-primary',
                         handler: () => {
                             resolve(true);
                         }
@@ -228,6 +245,14 @@ class ModalManager {
                 onClose: () => resolve()
             });
         });
+    }
+
+    /**
+     * Get the modal body element
+     * @returns {HTMLElement}
+     */
+    getContent() {
+        return this._modal.querySelector('.modal-body');
     }
 }
 

@@ -30,48 +30,83 @@ class StorageService {
                 return;
             }
 
-            const request = indexedDB.open(config.storage.dbName, config.storage.dbVersion);
-
-            request.onerror = () => {
-                console.error('[Storage] IndexedDB error:', request.error);
-                this._dbReady = false;
-                resolve(null);
+            // First, try to delete any existing database to ensure clean upgrade
+            const deleteRequest = indexedDB.deleteDatabase(config.storage.dbName);
+            deleteRequest.onsuccess = () => {
+                console.log('[Storage] Old database deleted, creating new one');
+            };
+            deleteRequest.onerror = () => {
+                console.warn('[Storage] Could not delete existing database');
+            };
+            deleteRequest.onblocked = () => {
+                console.warn('[Storage] Database deletion blocked');
             };
 
-            request.onsuccess = () => {
-                this._db = request.result;
-                this._dbReady = true;
-                console.log('[Storage] IndexedDB initialized');
-                resolve(this._db);
-            };
+            // Wait a bit for deletion to complete, then open new database
+            setTimeout(() => {
+                const request = indexedDB.open(config.storage.dbName, config.storage.dbVersion);
 
-            request.onupgradeneeded = (event) => {
-                const db = event.target.result;
+                request.onerror = () => {
+                    console.error('[Storage] IndexedDB error:', request.error);
+                    this._dbReady = false;
+                    resolve(null);
+                };
 
-                // Create object stores
-                if (!db.objectStoreNames.contains('transactions')) {
-                    const txStore = db.createObjectStore('transactions', { keyPath: 'id' });
-                    txStore.createIndex('timestamp', 'created_at', { unique: false });
-                    txStore.createIndex('category', 'category', { unique: false });
-                }
+                request.onsuccess = () => {
+                    this._db = request.result;
+                    this._dbReady = true;
+                    console.log('[Storage] IndexedDB initialized');
+                    resolve(this._db);
+                };
 
-                if (!db.objectStoreNames.contains('journal')) {
-                    const journalStore = db.createObjectStore('journal', { keyPath: 'id' });
-                    journalStore.createIndex('timestamp', 'created_at', { unique: false });
-                    journalStore.createIndex('tag', 'tag', { unique: false });
-                }
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
 
-                if (!db.objectStoreNames.contains('events')) {
-                    const eventsStore = db.createObjectStore('events', { keyPath: 'id' });
-                    eventsStore.createIndex('kind', 'kind', { unique: false });
-                    eventsStore.createIndex('pubkey', 'pubkey', { unique: false });
-                }
+                    // Create object stores
+                    if (!db.objectStoreNames.contains('transactions')) {
+                        const txStore = db.createObjectStore('transactions', { keyPath: 'id' });
+                        txStore.createIndex('timestamp', 'created_at', { unique: false });
+                        txStore.createIndex('category', 'category', { unique: false });
+                    }
 
-                if (!db.objectStoreNames.contains('cache')) {
-                    db.createObjectStore('cache', { keyPath: 'key' });
-                }
-            };
-        });
+                    if (!db.objectStoreNames.contains('journal')) {
+                        const journalStore = db.createObjectStore('journal', { keyPath: 'id' });
+                        journalStore.createIndex('timestamp', 'created_at', { unique: false });
+                        journalStore.createIndex('tag', 'tag', { unique: false });
+                    }
+
+                    if (!db.objectStoreNames.contains('events')) {
+                        const eventsStore = db.createObjectStore('events', { keyPath: 'id' });
+                        eventsStore.createIndex('kind', 'kind', { unique: false });
+                        eventsStore.createIndex('pubkey', 'pubkey', { unique: false });
+                    }
+
+                    if (!db.objectStoreNames.contains('cache')) {
+                        db.createObjectStore('cache', { keyPath: 'key' });
+                    }
+
+                    // Create object stores for new features
+                    if (!db.objectStoreNames.contains('categories')) {
+                        const categoriesStore = db.createObjectStore('categories', { keyPath: 'id' });
+                        categoriesStore.createIndex('type', 'type', { unique: false });
+                        categoriesStore.createIndex('name', 'name', { unique: false });
+                    }
+
+                    if (!db.objectStoreNames.contains('budgets')) {
+                        const budgetsStore = db.createObjectStore('budgets', { keyPath: 'id' });
+                        budgetsStore.createIndex('categoryId', 'categoryId', { unique: false });
+                        budgetsStore.createIndex('period', 'period', { unique: false });
+                    }
+
+                    if (!db.objectStoreNames.contains('recurring')) {
+                        const recurringStore = db.createObjectStore('recurring', { keyPath: 'id' });
+                        recurringStore.createIndex('frequency', 'frequency', { unique: false });
+                        recurringStore.createIndex('nextDue', 'nextDue', { unique: false });
+                        recurringStore.createIndex('isActive', 'isActive', { unique: false });
+                    }
+                };
+            }, 100); // Wait 100ms for deletion to complete
+            });
 
         return this._initPromise;
     }

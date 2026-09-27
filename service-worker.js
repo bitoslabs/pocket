@@ -3,7 +3,7 @@
  * Offline support and caching for PWA
  */
 
-const CACHE_NAME = 'zap-journal-v1';
+const CACHE_NAME = 'zap-journal-v2';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -23,12 +23,28 @@ const STATIC_ASSETS = [
     '/js/services/nostr-service.js',
     '/js/services/zap-service.js',
     '/js/services/journal-service.js',
+    '/js/services/category-service.js',
+    '/js/services/budget-service.js',
+    '/js/services/recurring-service.js',
     '/js/utils/dom.js',
     '/js/utils/format.js',
+    '/js/utils/icons.js',
+    '/js/utils/ui.js',
     '/js/components/toast.js',
     '/js/components/modal.js',
     '/js/components/header.js',
     '/js/components/sidebar.js',
+    '/js/components/tabbar.js',
+    '/js/components/rail.js',
+    '/js/components/lock.js',
+    '/js/components/quick-add.js',
+    '/js/components/tx-modal.js',
+    '/js/components/journal-composer.js',
+    '/js/components/budgets-modal.js',
+    '/js/components/login-modal.js',
+    '/js/components/transaction-form.js',
+    '/js/components/budget-progress.js',
+    '/js/components/category-manager.js',
     '/js/pages/dashboard.js',
     '/js/pages/transactions.js',
     '/js/pages/journal.js',

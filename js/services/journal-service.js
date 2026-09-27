@@ -82,6 +82,8 @@ class JournalService {
             const tags = this._parseTags(event.tags);
             if (!tags.app || tags.app !== 'nostr-zap-journal') return;
 
+            const tagList = this._parseTagList(event.tags);
+
             // Decrypt content
             const pubkey = authService.getPublicKey();
             let content;
@@ -105,7 +107,9 @@ class JournalService {
                 id: event.id,
                 title: entryData.title || 'Untitled',
                 text: entryData.text || '',
-                tag: tags.t || 'personal',
+                tag: tagList[0] || tags.t || 'personal',
+                tags: tagList.length ? tagList : (tags.t ? [tags.t] : []),
+                mood: entryData.mood || null,
                 linkedTransaction: tags.e,
                 created_at: event.created_at,
                 updated_at: entryData.updated_at || event.created_at,
@@ -137,29 +141,40 @@ class JournalService {
      * @param {Object} data - Entry data
      * @returns {Promise<Object>} Created entry
      */
-    async create({ title, text, tag = 'personal', linkedTransaction = null }) {
+    async create({ title, text, tag = 'personal', tags = null, mood = null, linkedTransaction = null }) {
         const pubkey = authService.getPublicKey();
         if (!pubkey) throw new Error('Not authenticated');
+
+        const tagList = Array.isArray(tags) && tags.length ? tags : (tag ? [tag] : []);
 
         // Create content object
         const content = JSON.stringify({
             title,
             text,
+            mood,
+            tags: tagList,
             updated_at: Math.floor(Date.now() / 1000)
         });
 
         // Encrypt content
         const encryptedContent = await authService.encrypt(pubkey, content);
 
-        // Build tags
-        const tags = [
+        // Build event tags
+        const eventTags = [
             ['p', pubkey],
-            ['app', 'nostr-zap-journal'],
-            ['t', tag]
+            ['app', 'nostr-zap-journal']
         ];
+        const seen = new Set();
+        tagList.forEach(t => {
+            if (!seen.has(t)) {
+                seen.add(t);
+                eventTags.push(['t', t]);
+            }
+        });
+        if (!tagList.length && tag) eventTags.push(['t', tag]);
 
         if (linkedTransaction) {
-            tags.push(['e', linkedTransaction]);
+            eventTags.push(['e', linkedTransaction]);
         }
 
         // Create unsigned event
@@ -167,7 +182,7 @@ class JournalService {
             kind: config.kinds.ENCRYPTED_DM,
             pubkey,
             created_at: Math.floor(Date.now() / 1000),
-            tags,
+            tags: eventTags,
             content: encryptedContent
         };
 
@@ -184,7 +199,9 @@ class JournalService {
             id: signedEvent.id,
             title,
             text,
-            tag,
+            tag: tagList[0] || tag,
+            tags: tagList,
+            mood,
             linkedTransaction,
             created_at: signedEvent.created_at,
             updated_at: signedEvent.created_at,
@@ -282,7 +299,10 @@ class JournalService {
     getTags() {
         const entries = store.get('journal') || [];
         const tagCounts = entries.reduce((acc, e) => {
-            acc[e.tag] = (acc[e.tag] || 0) + 1;
+            const list = Array.isArray(e.tags) && e.tags.length ? e.tags : (e.tag ? [e.tag] : []);
+            list.forEach(t => {
+                acc[t] = (acc[t] || 0) + 1;
+            });
             return acc;
         }, {});
 
@@ -307,6 +327,8 @@ class JournalService {
                 title: e.title,
                 text: e.text,
                 tag: e.tag,
+                tags: e.tags,
+                mood: e.mood,
                 linkedTransaction: e.linkedTransaction,
                 created_at: e.created_at
             }))
@@ -326,6 +348,16 @@ class JournalService {
             result[key] = value;
         }
         return result;
+    }
+
+    /**
+     * Collect all 't' tag values as an array
+     * @private
+     */
+    _parseTagList(tags) {
+        return tags
+            .filter(t => t[0] === 't' && t[1])
+            .map(t => t[1]);
     }
 }
 

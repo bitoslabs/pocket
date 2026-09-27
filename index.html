@@ -8,19 +8,11 @@
     />
     <meta
       name="description"
-      content="Track your Lightning zaps and manage private journal entries on Nostr"
+      content="ZapJournal — a private journal and Lightning sats tracker on Nostr"
     />
-    <meta
-      name="theme-color"
-      content="#000000"
-      media="(prefers-color-scheme: dark)"
-    />
-    <meta
-      name="theme-color"
-      content="#f2f2f7"
-      media="(prefers-color-scheme: light)"
-    />
+    <meta name="theme-color" content="#0B0912" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
@@ -30,92 +22,94 @@
     <link rel="manifest" href="manifest.json" />
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
 
-    <title>Nostr Zap Journal</title>
+    <title>ZapJournal 🔒 — Private Journal & Sats</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
 
     <!-- Styles -->
     <link rel="stylesheet" href="css/variables.css" />
     <link rel="stylesheet" href="css/base.css" />
     <link rel="stylesheet" href="css/layout.css" />
     <link rel="stylesheet" href="css/components.css" />
-
-    <style>
-      /* Initial loading state */
-      .app-loading {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        background: var(--color-bg-primary);
-      }
-
-      .app-loading-content {
-        text-align: center;
-      }
-
-      .app-loading-logo {
-        font-size: 4rem;
-        margin-bottom: 1.5rem;
-        animation: pulse 2s ease-in-out infinite;
-      }
-
-      @keyframes pulse {
-        0%,
-        100% {
-          opacity: 1;
-          transform: scale(1);
-        }
-        50% {
-          opacity: 0.7;
-          transform: scale(0.95);
-        }
-      }
-
-      .app-loading-text {
-        font-size: 1.125rem;
-        color: var(--color-text-secondary);
-      }
-
-      /* Hide loading when app is ready */
-      .app-ready .app-loading {
-        display: none;
-      }
-    </style>
   </head>
   <body>
+    <div class="bg"></div>
+
     <!-- Loading State -->
-    <div class="app-loading" id="app-loading">
-      <div class="app-loading-content">
-        <div class="app-loading-logo">⚡</div>
-        <p class="app-loading-text">Loading Zap Journal...</p>
+    <div class="lockscr" id="app-loading">
+      <div class="lock-brand">
+        <span class="lock-mark ic" data-icon="bolt"></span>
+        <h1>Zap<em>Journal</em></h1>
       </div>
+      <div class="lock-sub">Loading your private corner…</div>
     </div>
 
     <!-- Main Application -->
-    <div class="app" id="app" style="display: none">
-      <!-- Sidebar Overlay for mobile -->
-      <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <div class="app" id="app" hidden>
+      <!-- Sidebar (desktop) -->
+      <aside
+        class="sidebar"
+        id="sidebar"
+        role="navigation"
+        aria-label="Main navigation"
+      ></aside>
 
-      <!-- Sidebar -->
-      <aside class="app-sidebar" role="navigation" aria-label="Main navigation">
-        <!-- Sidebar content mounted by JS -->
-      </aside>
+      <!-- Main column -->
+      <div class="shell">
+        <header class="topbar" id="topbar" role="banner"></header>
+        <main class="app-content" id="app-content" role="main"></main>
+      </div>
 
-      <!-- Main Content Area -->
-      <main class="app-main">
-        <!-- Header -->
-        <header class="app-header" role="banner">
-          <!-- Header content mounted by JS -->
-        </header>
+      <!-- Right rail (wide desktop) -->
+      <aside class="rail" id="rail" aria-label="Insights"></aside>
+    </div>
 
-        <!-- Page Content -->
-        <div class="app-content" role="main">
-          <!-- Page content mounted by router -->
-        </div>
-      </main>
+    <!-- Dock (mobile / tablet) -->
+    <nav class="dock" id="dock" aria-label="Primary navigation"></nav>
 
-      <!-- iOS Tab Bar (mobile) -->
-      <div class="app-tabbar" role="navigation" aria-label="Tab navigation">
-        <!-- Tab bar content mounted by JS -->
+    <!-- Toasts -->
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+
+    <!-- Lock Screen -->
+    <div class="lockscr" id="lockscr" role="dialog" aria-modal="true" hidden>
+      <div class="lock-brand">
+        <span class="lock-mark ic" data-icon="bolt"></span>
+        <h1>Zap<em>Journal</em></h1>
+      </div>
+      <div class="lock-title" id="lockTitle">Create your PIN</div>
+      <div class="lock-sub" id="lockSub">
+        4 digits · keeps your journal private on this device
+      </div>
+      <div class="pin-dots" id="pinDots">
+        <span class="pdot"></span><span class="pdot"></span
+        ><span class="pdot"></span><span class="pdot"></span>
+      </div>
+      <div class="keypad" id="keypad">
+        <button class="key" data-key="1">1</button>
+        <button class="key" data-key="2">2</button>
+        <button class="key" data-key="3">3</button>
+        <button class="key" data-key="4">4</button>
+        <button class="key" data-key="5">5</button>
+        <button class="key" data-key="6">6</button>
+        <button class="key" data-key="7">7</button>
+        <button class="key" data-key="8">8</button>
+        <button class="key" data-key="9">9</button>
+        <button class="key ghost" aria-hidden="true"></button>
+        <button class="key" data-key="0">0</button>
+        <button class="key" data-key="back" aria-label="Delete">
+          <span class="ic" data-icon="back"></span>
+        </button>
+      </div>
+      <div class="lock-foot">
+        Private by design · data never leaves this device<br />
+        <button id="forgotPin" hidden>Forgot PIN?</button>
+        <button id="lockCancel" hidden>Not now</button>
       </div>
     </div>
 
@@ -126,11 +120,23 @@
     <script type="module">
       import app from "./js/app.js";
 
-      // Show app when loaded
-      window.addEventListener("load", () => {
-        document.getElementById("app-loading").style.display = "none";
-        document.getElementById("app").style.display = "flex";
+      const reveal = () => {
+        const loading = document.getElementById("app-loading");
+        const appEl = document.getElementById("app");
+        if (loading) loading.hidden = true;
+        if (appEl) appEl.hidden = false;
         document.body.classList.add("app-ready");
+      };
+
+      window.addEventListener("load", () => {
+        // Never leave the user on the loader, even if a relay stalls.
+        const safety = setTimeout(reveal, 6000);
+        Promise.resolve(app.init())
+          .catch((err) => console.error("[App] init failed:", err))
+          .finally(() => {
+            clearTimeout(safety);
+            reveal();
+          });
       });
     </script>
 

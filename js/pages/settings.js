@@ -1,287 +1,349 @@
 /**
- * Settings Page
- * App configuration and preferences
- * 
+ * Profile Page - identity, stats, settings, data management
+ *
  * @module pages/settings
  */
 
 import { Component } from '../core/component.js';
 import { store } from '../core/state.js';
 import { config } from '../config.js';
-import { eventBus, Events } from '../core/event-bus.js';
-import { storageService } from '../services/storage-service.js';
-import { nostrService } from '../services/nostr-service.js';
+import { authService } from '../services/auth-service.js';
 import { journalService } from '../services/journal-service.js';
-import { Icons } from '../utils/icons.js';
+import { nostrService } from '../services/nostr-service.js';
+import { storageService } from '../services/storage-service.js';
+import { modal } from '../components/modal.js';
+import { lock } from '../components/lock.js';
+import { Icons, hydrateIcons } from '../utils/icons.js';
+import {
+  categoryMeta,
+  copyText,
+  fmtSats,
+  hueOf,
+  isIncome,
+  shortNpub,
+  toast,
+  toMs,
+} from '../utils/ui.js';
 
-export class SettingsPage extends Component {
-  constructor(options) {
-    super(options);
-    this._state = {
-      newRelay: ''
-    };
+const NAME_KEY = 'zapjournal.name';
+const BIO_KEY = 'zapjournal.bio';
+
+export class ProfilePage extends Component {
+  mounted() {
+    this.watchStore('user', () => this.render());
+    this.watchStore('isAuthenticated', () => this.render());
+    this.watchStore('transactions', () => this.render());
+    this.watchStore('journal', () => this.render());
+    this.watchStore('relays', () => this.render());
+    this.watchStore('appLock', () => this.render());
   }
 
-  mounted() {
-    this.watchStore('relays', () => this.render());
-    this.watchStore('theme', () => this.render());
+  _profile() {
+    const user = store.get('user');
+    const npub = user?.npub || '';
+    const name =
+      storageService.getLocal(NAME_KEY) || (npub ? shortNpub(npub) : 'Anon Nostrich');
+    const bio =
+      storageService.getLocal(BIO_KEY) ||
+      'Private journal, honest numbers. Where my days and my sats meet.';
+    return { user, npub, name, bio };
   }
 
   template() {
-    const theme = store.get('theme') || 'dark';
-    const relays = store.get('relays') || { connected: [], pending: [], failed: [] };
-    const connectedRelays = relays.connected || [];
+    const { npub, name, bio } = this._profile();
+    const authenticated = store.get('isAuthenticated');
+    const entries = store.get('journal') || [];
+    const txs = store.get('transactions') || [];
+
+    const tin = txs.filter(isIncome).reduce((a, t) => a + (Number(t.amount) || 0), 0);
+    const tout = txs.filter((t) => !isIncome(t)).reduce((a, t) => a + (Number(t.amount) || 0), 0);
+
+    const spentAll = {};
+    txs.filter((t) => !isIncome(t)).forEach((t) => {
+      const k = t.category || 'uncategorized';
+      spentAll[k] = (spentAll[k] || 0) + (Number(t.amount) || 0);
+    });
+    const topCat = Object.entries(spentAll).sort((a, b) => b[1] - a[1])[0];
+
+    const h = hueOf(npub || name);
+    const streak = this._streak(entries);
+    const appLock = store.get('appLock');
+    const relays = store.get('relays')?.connected || [];
     const savedRelays = storageService.getLocal(config.storage.keys.RELAYS) || config.relays.default;
 
     return `
-      <div class="page-header mb-6">
-        <h1 class="text-3xl font-bold">Settings</h1>
-        <p class="text-secondary mt-2">Configure your preferences</p>
-      </div>
+      <div class="view-title">Profile</div>
 
-      <!-- Appearance -->
-      <div class="card mb-6">
-        <div class="card-header">
-          <h2 class="card-title">Appearance</h2>
-        </div>
-        <div class="card-body">
-          <div class="setting-item flex justify-between items-center py-4">
-            <div>
-              <h3 class="font-medium">Theme</h3>
-              <p class="text-sm text-secondary">Choose your preferred color scheme</p>
-            </div>
-            <div class="theme-toggle-group flex gap-2">
-              <button class="btn ${theme === 'dark' ? 'btn-primary' : 'btn-secondary'} btn-sm theme-btn" data-theme="dark">
-                ${Icons.Moon} <span>Dark</span>
-              </button>
-              <button class="btn ${theme === 'light' ? 'btn-primary' : 'btn-secondary'} btn-sm theme-btn" data-theme="light">
-                ${Icons.Sun} <span>Light</span>
-              </button>
-            </div>
+      <div class="card" style="padding-bottom:14px">
+        <div class="banner" style="background:linear-gradient(120deg,hsl(${h},60%,45%),hsl(${(h + 80) % 360},65%,35%))"></div>
+        <div class="prof-row">
+          <div class="avatar" style="background:linear-gradient(135deg,hsl(${h},65%,58%),hsl(${(h + 70) % 360},70%,48%))">
+            ${(name[0] || '?').toUpperCase()}
           </div>
+        </div>
+        <h2 class="prof-name">${this.escape(name)}</h2>
+        ${
+          npub
+            ? `<button class="npub-full" data-action="copy-npub">
+                 <span class="ic">${Icons.copy}</span>${shortNpub(npub)}</button>`
+            : ''
+        }
+        <p class="bio">${this.escape(bio)}</p>
+        <div class="prof-stats">
+          <div class="pstat"><b>${entries.length}</b><span>entries</span></div>
+          <div class="pstat"><b class="streak">${Icons.flame}${streak}</b><span>day streak</span></div>
+          <div class="pstat"><b style="color:var(--in)">${fmtSats(tin)}</b><span>all-time in</span></div>
+          <div class="pstat"><b style="color:var(--out)">${fmtSats(tout)}</b><span>all-time out</span></div>
         </div>
       </div>
 
-      <!-- Relays -->
-      <div class="card mb-6">
-        <div class="card-header">
-          <h2 class="card-title">Nostr Relays</h2>
-        </div>
-        <div class="card-body">
-          <div class="relay-list mb-4">
-            ${savedRelays.map(relay => this._renderRelayItem(relay, connectedRelays)).join('')}
-          </div>
-          
-          <div class="add-relay flex gap-2">
-            <input type="text" class="relay-input flex-1" placeholder="wss://relay.example.com" value="${this.escape(this._state.newRelay)}">
-            <button class="btn btn-primary add-relay-btn">Add Relay</button>
-          </div>
-        </div>
+      ${
+        topCat
+          ? `<div class="card"><p class="muted-p" style="padding:0">
+               Your biggest category: <b style="color:${categoryMeta(topCat[0]).color}">${
+                 categoryMeta(topCat[0]).label
+               }</b> · ${fmtSats(topCat[1])} sats</p></div>`
+          : ''
+      }
+
+      <div class="card" style="padding:6px 16px">
+        ${
+          authenticated
+            ? `<button class="set-row" data-action="logout"><span class="ic">${Icons.lock}</span>
+                 <span><b>Disconnect Nostr</b><span>${shortNpub(npub)}</span></span></button>`
+            : `<button class="set-row" data-action="connect"><span class="ic">${Icons.plug}</span>
+                 <span><b>Connect Nostr</b><span>NIP-07 extension, nsec or new account</span></span></button>`
+        }
+        <button class="set-row" data-action="edit-profile"><span class="ic">${Icons.edit}</span>
+          <span><b>Edit profile</b><span>Name &amp; bio</span></span></button>
+        <button class="set-row" data-action="toggle-lock" aria-pressed="${appLock}">
+          <span class="ic">${Icons.lock}</span>
+          <span><b>App lock</b><span>${
+            appLock ? 'PIN required to open ZapJournal' : 'Off · no PIN required'
+          }</span></span>
+          <span class="switch ${appLock ? 'on' : ''}" aria-hidden="true"></span>
+        </button>
+        ${
+          appLock
+            ? `<button class="set-row" data-action="change-pin"><span class="ic">${Icons.lock}</span>
+                 <span><b>Change PIN</b><span>Re-lock your journal with a new code</span></span></button>`
+            : ''
+        }
+        <button class="set-row" data-action="export"><span class="ic">${Icons.download}</span>
+          <span><b>Export data</b><span>Download everything as JSON — self-custody</span></span></button>
       </div>
 
-      <!-- Data Management -->
-      <div class="card mb-6">
-        <div class="card-header">
-          <h2 class="card-title">Data Management</h2>
-        </div>
-        <div class="card-body">
-          <div class="setting-item flex justify-between items-center py-4 border-b border-color-border">
-            <div>
-              <h3 class="font-medium">Export Journal Backup</h3>
-              <p class="text-sm text-secondary">Download an encrypted backup of your journal entries</p>
-            </div>
-            <button class="btn btn-secondary export-btn">Export</button>
-          </div>
-          
-          <div class="setting-item flex justify-between items-center py-4 border-b border-color-border">
-            <div>
-              <h3 class="font-medium">Clear Local Cache</h3>
-              <p class="text-sm text-secondary">Clear locally cached data (you won't lose data stored on relays)</p>
-            </div>
-            <button class="btn btn-secondary clear-cache-btn">Clear Cache</button>
-          </div>
-          
-          <div class="setting-item flex justify-between items-center py-4">
-            <div>
-              <h3 class="font-medium text-error">Reset All Data</h3>
-              <p class="text-sm text-secondary">Remove all local data and settings. This cannot be undone.</p>
-            </div>
-            <button class="btn btn-secondary reset-btn" style="border-color: var(--color-error); color: var(--color-error);">
-              Reset
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- About -->
       <div class="card">
-        <div class="card-header">
-          <h2 class="card-title">About</h2>
+        <div class="card-head"><h3>Relays</h3>
+          <span class="badge ${relays.length ? 'badge-success' : 'badge-neutral'}">${
+            relays.length
+          } connected</span>
         </div>
-        <div class="card-body">
-          <div class="about-info">
-            <p class="mb-2"><strong>Nostr Zap Journal</strong> v${config.app.version}</p>
-            <p class="text-sm text-secondary mb-4">
-              A private, encrypted journal and Lightning zap tracker built on Nostr.
-            </p>
-            <div class="flex gap-3">
-              <a href="https://github.com" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">
-                GitHub
-              </a>
-              <a href="https://nostr.com" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">
-                Nostr
-              </a>
-            </div>
-          </div>
+        ${savedRelays
+          .map((r) => {
+            const conn = relays.includes(r);
+            const isDefault = config.relays.default.includes(r);
+            return `<div class="set-row" style="cursor:default">
+              <span class="status-dot ${conn ? 'connected' : ''}"></span>
+              <span style="flex:1"><b class="font-mono" style="font-size:12px">${this.escape(r)}</b>
+                <span>${conn ? 'Connected' : 'Offline'}${
+              isDefault ? ' · default' : ''
+            }</span></span>
+              ${
+                !isDefault
+                  ? `<button class="btn btn-ghost btn-sm" data-action="remove-relay" data-relay="${this.escape(
+                      r
+                    )}">Remove</button>`
+                  : ''
+              }
+            </div>`;
+          })
+          .join('')}
+        <div class="join" style="margin-top:12px">
+          <input type="text" class="input relay-input" placeholder="wss://relay.example.com" />
+          <button class="btn btn-primary" data-action="add-relay" style="flex:0 0 auto">Add</button>
         </div>
       </div>
+
+      <div class="card" style="padding:6px 16px">
+        <button class="set-row danger" data-action="reset"><span class="ic">${Icons.trash}</span>
+          <span><b>Reset app</b><span>Wipe all entries &amp; transactions</span></span></button>
+      </div>
+
+      <p class="muted-p" style="margin-bottom:24px">
+        ZapJournal v${config.app.version} · private · local-first
+      </p>
     `;
   }
 
-  _renderRelayItem(relay, connectedRelays) {
-    const isConnected = connectedRelays.includes(relay);
-    const isDefault = config.relays.default.includes(relay);
-
-    return `
-      <div class="relay-item flex items-center justify-between py-3 border-b border-color-border">
-        <div class="flex items-center gap-3">
-          <span class="status-dot ${isConnected ? 'connected' : ''}"></span>
-          <span class="text-sm font-mono">${this.escape(relay)}</span>
-          ${isDefault ? '<span class="badge badge-neutral">Default</span>' : ''}
-        </div>
-        <div class="flex gap-2">
-          ${isConnected
-        ? '<span class="text-xs text-success">Connected</span>'
-        : `<button class="btn btn-ghost btn-sm reconnect-relay-btn" data-relay="${this.escape(relay)}">Reconnect</button>`
-      }
-          ${!isDefault ? `<button class="btn btn-ghost btn-sm remove-relay-btn" data-relay="${this.escape(relay)}">Remove</button>` : ''}
-        </div>
-      </div>
-    `;
+  _streak(entries) {
+    const days = new Set(
+      entries.map((e) => {
+        const d = new Date(toMs(e.created_at));
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+      })
+    );
+    let s = 0;
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    if (!days.has(d.getTime())) d.setDate(d.getDate() - 1);
+    while (days.has(d.getTime())) {
+      s++;
+      d.setDate(d.getDate() - 1);
+    }
+    return s;
   }
 
   bindEvents() {
-    // Theme toggle (delegated)
-    this.addEventListener('.theme-toggle-group', 'click', (e) => {
-      const btn = e.target.closest('.theme-btn');
-      if (btn) {
-        const theme = btn.dataset.theme;
-        store.set('theme', theme);
-        document.documentElement.setAttribute('data-theme', theme);
-        storageService.setLocal(config.storage.keys.THEME, theme);
-        eventBus.emit(Events.THEME_CHANGED, { theme });
-      }
-    });
+    if (this._delegated) return;
+    this._delegated = true;
+    this.container.addEventListener('click', async (e) => {
+      const el = e.target.closest('[data-action]');
+      if (!el || !this.container.contains(el)) return;
+      const action = el.dataset.action;
 
-    // Add relay
-    this.addEventListener('.add-relay-btn', 'click', () => {
-      const input = this.$('.relay-input');
-      const url = input.value.trim();
-
-      if (!url.startsWith('wss://')) {
-        eventBus.emit(Events.TOAST_SHOW, {
-          type: 'warning',
-          message: 'Relay URL must start with wss://'
-        });
-        return;
-      }
-
-      const savedRelays = storageService.getLocal(config.storage.keys.RELAYS) || [...config.relays.default];
-      if (!savedRelays.includes(url)) {
-        savedRelays.push(url);
-        storageService.setLocal(config.storage.keys.RELAYS, savedRelays);
-        nostrService.connect(url);
-        this.setState({ newRelay: '' });
+      if (action === 'connect') {
+        const { loginModal } = await import('../components/login-modal.js');
+        loginModal.show();
+      } else if (action === 'logout') {
+        authService.logout();
+        toast('Disconnected', 'info');
+      } else if (action === 'copy-npub') {
+        const { npub } = this._profile();
+        if (npub) copyText(npub, 'npub copied to clipboard');
+      } else if (action === 'edit-profile') {
+        this._openEditProfile();
+      } else if (action === 'toggle-lock') {
+        if (lock.isEnabled()) {
+          const ok = await modal.confirm({
+            title: 'Turn off app lock',
+            message: 'ZapJournal will open without a PIN on this device.',
+            confirmText: 'Turn off',
+            danger: true,
+          });
+          if (!ok) return;
+          lock.disable();
+          toast('App lock off', 'info');
+        } else {
+          lock.show('setup', { cancelable: true });
+        }
+      } else if (action === 'change-pin') {
+        lock.show('setup', { cancelable: true });
+      } else if (action === 'export') {
+        this._exportData();
+      } else if (action === 'add-relay') {
+        this._addRelay();
+      } else if (action === 'remove-relay') {
+        const relay = el.dataset.relay;
+        const saved = storageService.getLocal(config.storage.keys.RELAYS) || [];
+        storageService.setLocal(
+          config.storage.keys.RELAYS,
+          saved.filter((r) => r !== relay)
+        );
+        nostrService.disconnect(relay);
         this.render();
-      }
-    });
-
-    // Reconnect relay
-    this.addEventListener('.reconnect-relay-btn', 'click', (e) => {
-      const relay = e.target.dataset.relay;
-      nostrService.connect(relay);
-      eventBus.emit(Events.TOAST_SHOW, {
-        type: 'info',
-        message: `Reconnecting to ${relay}...`
-      });
-    });
-
-    // Remove relay
-    this.addEventListener('.remove-relay-btn', 'click', (e) => {
-      const relay = e.target.dataset.relay;
-      const savedRelays = storageService.getLocal(config.storage.keys.RELAYS) || [];
-      const filtered = savedRelays.filter(r => r !== relay);
-      storageService.setLocal(config.storage.keys.RELAYS, filtered);
-      nostrService.disconnect(relay);
-      this.render();
-    });
-
-    // Export backup
-    this.addEventListener('.export-btn', 'click', async () => {
-      try {
-        const backup = await journalService.exportBackup();
-        const blob = new Blob([backup], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `zap-journal-backup-${Date.now()}.txt`;
-        a.click();
-        URL.revokeObjectURL(url);
-
-        eventBus.emit(Events.TOAST_SHOW, {
-          type: 'success',
-          message: 'Backup exported successfully'
+      } else if (action === 'reset') {
+        const confirmed = await modal.confirm({
+          title: 'Reset app',
+          message:
+            'This wipes all local entries, transactions and settings. This cannot be undone.',
+          confirmText: 'Reset everything',
+          danger: true,
         });
-      } catch (error) {
-        eventBus.emit(Events.TOAST_SHOW, {
-          type: 'error',
-          message: error.message
-        });
-      }
-    });
-
-    // Clear cache
-    this.addEventListener('.clear-cache-btn', 'click', async () => {
-      const { modal } = await import('../components/modal.js');
-      const confirmed = await modal.confirm({
-        title: 'Clear Cache',
-        message: 'This will clear locally cached transactions and journal entries. Your data on relays will not be affected.',
-        confirmText: 'Clear'
-      });
-
-      if (confirmed) {
-        await storageService.clear('transactions');
-        await storageService.clear('journal');
-        store.set('transactions', []);
-        store.set('journal', []);
-
-        eventBus.emit(Events.TOAST_SHOW, {
-          type: 'success',
-          message: 'Cache cleared'
-        });
-      }
-    });
-
-    // Reset all
-    this.addEventListener('.reset-btn', 'click', async () => {
-      const { modal } = await import('../components/modal.js');
-      const confirmed = await modal.confirm({
-        title: 'Reset All Data',
-        message: 'This will remove all local data including settings, cached transactions, and journal entries. This action cannot be undone.',
-        confirmText: 'Reset Everything',
-        danger: true
-      });
-
-      if (confirmed) {
-        localStorage.clear();
-        await storageService.clear('transactions');
-        await storageService.clear('journal');
-        await storageService.clear('events');
-
-        window.location.reload();
+        if (!confirmed) return;
+        try {
+          localStorage.clear();
+          await storageService.clear('transactions');
+          await storageService.clear('journal');
+          await storageService.clear('events');
+        } catch (err) {
+          /* ignore */
+        }
+        location.reload();
       }
     });
   }
+
+  _openEditProfile() {
+    const { name, bio } = this._profile();
+    const content = document.createElement('div');
+    content.innerHTML = `
+      <label class="fld">Display name
+        <input type="text" id="peName" maxlength="40" value="${this.escape(name)}" />
+      </label>
+      <label class="fld">Bio
+        <textarea id="peBio" rows="3" maxlength="160">${this.escape(bio)}</textarea>
+      </label>`;
+    modal.open({
+      title: 'Edit profile',
+      content,
+      actions: [
+        {
+          label: 'Save',
+          variant: 'btn-primary',
+          handler: () => {
+            const n = content.querySelector('#peName').value.trim();
+            const b = content.querySelector('#peBio').value.trim();
+            storageService.setLocal(NAME_KEY, n || name);
+            storageService.setLocal(BIO_KEY, b);
+            this.render();
+            toast('Profile updated ✓');
+          },
+        },
+      ],
+    });
+  }
+
+  _exportData() {
+    const data = {
+      app: 'ZapJournal',
+      version: config.app.version,
+      exported_at: new Date().toISOString(),
+      transactions: store.get('transactions') || [],
+      journal: (store.get('journal') || []).map((e) => ({
+        id: e.id,
+        title: e.title,
+        text: e.text,
+        tag: e.tag,
+        tags: e.tags,
+        mood: e.mood,
+        linkedTransaction: e.linkedTransaction,
+        created_at: e.created_at,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `zapjournal-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('Backup downloaded — your keys, your data ⚡');
+  }
+
+  _addRelay() {
+    const input = this.$('.relay-input');
+    const url = (input?.value || '').trim();
+    if (!url.startsWith('wss://')) {
+      toast('Relay URL must start with wss://', 'warning');
+      return;
+    }
+    const saved = storageService.getLocal(config.storage.keys.RELAYS) || [
+      ...config.relays.default,
+    ];
+    if (!saved.includes(url)) {
+      saved.push(url);
+      storageService.setLocal(config.storage.keys.RELAYS, saved);
+      nostrService.connect(url);
+      input.value = '';
+      this.render();
+      toast('Relay added');
+    }
+  }
+
+  afterRender() {
+    hydrateIcons(this.container);
+  }
 }
 
-export default SettingsPage;
+export default ProfilePage;

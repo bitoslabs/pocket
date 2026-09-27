@@ -1,4 +1,4 @@
-# Nostr Zap Journal - Architecture Documentation
+# Nostr Zap Journal and Journal App - Architecture Documentation
 
 ## Overview
 

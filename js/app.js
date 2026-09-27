@@ -9,6 +9,7 @@ import { config } from './config.js';
 import { eventBus, Events } from './core/event-bus.js';
 import { store } from './core/state.js';
 import { initTheme } from './core/theme.js';
+import { GUEST, filterOwned } from './core/account.js';
 import { router } from './router.js';
 
 // Services
@@ -21,6 +22,7 @@ import { categoryService } from './services/category-service.js';
 import { budgetService } from './services/budget-service.js';
 import { recurringService } from './services/recurring-service.js';
 import { priceService } from './services/price-service.js';
+import { syncService } from './services/sync-service.js';
 
 // Components
 import { Header } from './components/header.js';
@@ -84,7 +86,22 @@ class App {
                 const pubkey = authService.getPublicKey();
                 await zapService.init(pubkey);
                 await journalService.init(pubkey);
+            } else {
+                // Guest mode: load only guest-owned local data so the app still
+                // works offline / without login, without leaking account data.
+                const [cachedTx, cachedJournal] = await Promise.all([
+                    storageService.getAll('transactions'),
+                    storageService.getAll('journal'),
+                ]);
+                const guestTx = filterOwned(cachedTx, GUEST);
+                const guestJournal = filterOwned(cachedJournal, GUEST);
+                if (guestTx.length > 0) store.set('transactions', guestTx);
+                if (guestJournal.length > 0) store.set('journal', guestJournal);
             }
+
+            // Offline-first sync: flush queued changes, pull remote, claim guest data on login
+            await syncService.init();
+            await syncService.start();
 
             // App lock is opt-in (default off): only gate when a PIN is set
             const appLockEnabled = lock.hasPin();
@@ -105,13 +122,21 @@ class App {
         eventBus.on(Events.AUTH_LOGIN, async (user) => {
             await zapService.init(user.pubkey);
             await journalService.init(user.pubkey);
+            // Re-scope local config data (categories/budgets/recurring) to the account
+            await categoryService.init();
+            await budgetService.init();
+            await recurringService.init();
         });
 
-        eventBus.on(Events.AUTH_LOGOUT, () => {
+        eventBus.on(Events.AUTH_LOGOUT, async () => {
             zapService.unsubscribe();
             journalService.unsubscribe();
             store.set('transactions', []);
             store.set('journal', []);
+            // Fall back to the guest workspace
+            await categoryService.init();
+            await budgetService.init();
+            await recurringService.init();
         });
 
         eventBus.on(Events.ERROR, ({ message }) => {

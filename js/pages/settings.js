@@ -44,6 +44,7 @@ export class ProfilePage extends Component {
     this.watchStore('relays', () => this.render());
     this.watchStore('appLock', () => this.render());
     this.watchStore('price', () => this.render());
+    this.watchStore('sync', () => this.render());
   }
 
   _profile() {
@@ -74,6 +75,8 @@ export class ProfilePage extends Component {
     const topCat = Object.entries(spentAll).sort((a, b) => b[1] - a[1])[0];
 
     const appLock = store.get('appLock');
+    const sync = store.get('sync') || {};
+    const relaysConnected = (store.get('relays.connected') || []).length;
     const themeMode = getTheme();
     const accent = getAccent();
     const streak = this._streak(entries);
@@ -220,6 +223,53 @@ export class ProfilePage extends Component {
         </div>
       </div>
 
+      ${
+        (() => {
+          const pending = sync.pending || 0;
+          let label = 'All synced';
+          let badge = 'badge-neutral';
+          let sub = relaysConnected
+            ? `${relaysConnected} relay${relaysConnected === 1 ? '' : 's'} connected`
+            : 'No relays connected';
+          if (!authenticated) {
+            label = 'Local only';
+            badge = 'badge-neutral';
+            sub = 'Log in to back up and sync to Nostr';
+          } else if (!sync.online) {
+            label = 'Offline';
+            badge = 'badge-error';
+            sub = pending > 0 ? `${pending} change${pending === 1 ? '' : 's'} waiting` : 'Changes sync when back online';
+          } else if (sync.status === 'syncing') {
+            label = 'Syncing…';
+            badge = 'badge-neutral';
+          } else if (sync.status === 'error') {
+            label = 'Sync error';
+            badge = 'badge-error';
+            sub = sync.error || 'Tap Sync now to retry';
+          } else if (pending > 0) {
+            label = `${pending} pending`;
+            badge = 'badge-neutral';
+            sub = 'Waiting to publish';
+          } else if (sync.lastSyncedAt) {
+            sub = `Last synced ${new Date(sync.lastSyncedAt).toLocaleTimeString()}`;
+          }
+          return `<div class="card">
+            <div class="card-head"><h3>Sync</h3><span class="badge ${badge}">${label}</span></div>
+            <div class="set-row" style="cursor:default">
+              <span class="ic">${Icons.bolt}</span>
+              <span style="flex:1;min-width:0"><b>${label}</b><span>${sub}</span></span>
+              ${
+                authenticated
+                  ? `<button class="btn btn-ghost btn-sm" data-action="retry-sync" ${
+                      sync.online ? '' : 'disabled'
+                    }>Sync now</button>`
+                  : ''
+              }
+            </div>
+          </div>`;
+        })()
+      }
+
       <div class="card" style="padding:6px 16px">
         ${
           authenticated
@@ -332,6 +382,10 @@ export class ProfilePage extends Component {
         priceService.setRateSource(el.dataset.src);
       } else if (action === 'refresh-rate') {
         priceService.refresh();
+      } else if (action === 'retry-sync') {
+        const { syncService } = await import('../services/sync-service.js');
+        toast('Syncing…', 'info');
+        await syncService.retryNow();
       } else if (action === 'logout') {
         authService.logout();
         toast('Disconnected', 'info');

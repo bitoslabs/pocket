@@ -41,6 +41,7 @@ export class MoneyPage extends Component {
     this.watchStore('transactions', () => this.render());
     this.watchStore('ui.query', () => this.render());
     this.watchStore('price', () => this.render());
+    this.watchStore('sync', () => this.render());
   }
 
   template() {

@@ -13,6 +13,47 @@ import { lock } from './lock.js';
 export class Header extends Component {
   mounted() {
     this.watchStore('appLock', () => this.render());
+    this.watchStore('sync', () => {
+      const chip = this._syncChip();
+      if (chip !== this._lastSyncChip) {
+        this._lastSyncChip = chip;
+        this.render();
+      }
+    });
+    this.watchStore('isAuthenticated', () => {
+      this._lastSyncChip = null;
+      this.render();
+    });
+  }
+
+  _syncChip() {
+    const authed = store.get('isAuthenticated');
+    const sync = store.get('sync') || {};
+    let label = '';
+    let cls = 'ok';
+    if (!authed) {
+      label = 'Local only';
+      cls = 'off';
+    } else if (!sync.online) {
+      label = sync.pending > 0 ? `Offline · ${sync.pending}` : 'Offline';
+      cls = 'off';
+    } else if (sync.status === 'syncing') {
+      label = 'Syncing…';
+      cls = 'busy';
+    } else if (sync.status === 'error') {
+      label = 'Sync error';
+      cls = 'err';
+    } else if (sync.pending > 0) {
+      label = `${sync.pending} pending`;
+      cls = 'pending';
+    } else {
+      label = 'Synced';
+      cls = 'ok';
+    }
+    const retryable =
+      authed && sync.online && (sync.status === 'error' || (sync.pending || 0) > 0);
+    const title = retryable ? 'Tap to sync now' : 'Local-first sync status';
+    return `<span class="sync-chip ${cls}${retryable ? ' retryable' : ''}" title="${title}">${label}</span>`;
   }
 
   template() {
@@ -27,6 +68,7 @@ export class Header extends Component {
         <input id="searchInput" placeholder="Search entries, notes, categories…" autocomplete="off" />
       </div>
       <div class="top-actions">
+        ${this._syncChip()}
         <button class="icon-btn search-toggle" id="searchToggle" aria-label="Search" aria-expanded="false">
           <span class="ic">${Icons.search}</span>
         </button>
@@ -66,6 +108,13 @@ export class Header extends Component {
 
     this.addEventListener(this.$('[data-action="lock"]'), 'click', () => {
       lock.show('unlock');
+    });
+
+    this.addEventListener(this.$('.sync-chip'), 'click', async () => {
+      const sync = store.get('sync') || {};
+      if (!sync.online || (sync.status !== 'error' && !(sync.pending > 0))) return;
+      const { syncService } = await import('../services/sync-service.js');
+      await syncService.retryNow();
     });
   }
 

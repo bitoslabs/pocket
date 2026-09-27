@@ -8,6 +8,8 @@
 import { config } from '../config.js';
 import { eventBus, Events } from '../core/event-bus.js';
 import { store } from '../core/state.js';
+import { currentOwner, filterOwned } from '../core/account.js';
+import { outbox } from './outbox.js';
 import { authService } from './auth-service.js';
 import { nostrService } from './nostr-service.js';
 import { storageService } from './storage-service.js';
@@ -25,8 +27,8 @@ class JournalService {
     async init(pubkey) {
         if (!pubkey) return;
 
-        // Load cached entries
-        const cached = await storageService.getAll('journal');
+        // Load cached entries for this account only
+        const cached = filterOwned(await storageService.getAll('journal'), pubkey);
         if (cached.length > 0) {
             store.set('journal', cached);
         }
@@ -46,9 +48,8 @@ class JournalService {
 
         // Filter for encrypted DMs from and to self
         const filter = {
-            kinds: [config.kinds.ENCRYPTED_DM],
+            kinds: [config.kinds.ENCRYPTED_DM, config.kinds.DELETE],
             authors: [pubkey],
-            '#p': [pubkey],
             limit: 200
         };
 
@@ -78,6 +79,12 @@ class JournalService {
      */
     async _handleJournalEvent(event) {
         try {
+            // Remote delete request (kind 5) referencing a journal event
+            if (event.kind === config.kinds.DELETE) {
+                this._handleJournalDelete(event);
+                return;
+            }
+
             // Check if this is a journal entry (has our app tag)
             const tags = this._parseTags(event.tags);
             if (!tags.app || tags.app !== 'nostr-zap-journal') return;
@@ -103,8 +110,8 @@ class JournalService {
                 entryData = { text: content };
             }
 
-            const entry = {
-                id: event.id,
+            const fields = {
+                owner: pubkey,
                 title: entryData.title || 'Untitled',
                 text: entryData.text || '',
                 tag: tagList[0] || tags.t || 'personal',
@@ -113,18 +120,25 @@ class JournalService {
                 linkedTransaction: tags.e,
                 created_at: event.created_at,
                 updated_at: entryData.updated_at || event.created_at,
+                eventId: event.id,
                 raw: event
             };
 
-            // Check for duplicates and update state
+            // Reconcile with a local (possibly still-pending) record using the
+            // `client` tag so publishing our own entry doesn't create a duplicate.
             const existing = store.get('journal') || [];
-            const existingIndex = existing.findIndex(e => e.id === entry.id);
+            const existingIndex = existing.findIndex(
+                (e) => (tags.client && e.id === tags.client) || e.eventId === event.id || e.id === event.id
+            );
 
+            let entry;
             let updated;
             if (existingIndex >= 0) {
+                entry = { ...existing[existingIndex], ...fields, id: existing[existingIndex].id };
                 updated = [...existing];
                 updated[existingIndex] = entry;
             } else {
+                entry = { id: event.id, ...fields };
                 updated = [entry, ...existing].sort((a, b) => b.created_at - a.created_at);
             }
 
@@ -137,81 +151,66 @@ class JournalService {
     }
 
     /**
+     * Apply a remote kind 5 delete to local journal entries.
+     * @private
+     */
+    _handleJournalDelete(event) {
+        const ids = (event.tags || []).filter(t => t[0] === 'e' && t[1]).map(t => t[1]);
+        if (!ids.length) return;
+
+        const entries = store.get('journal') || [];
+        const removed = entries.filter(e => ids.includes(e.eventId) || ids.includes(e.id));
+        if (!removed.length) return;
+
+        store.set('journal', entries.filter(e => !ids.includes(e.eventId) && !ids.includes(e.id)));
+        removed.forEach(e => storageService.delete('journal', e.id));
+        eventBus.emit(Events.JOURNAL_UPDATED, { action: 'delete' });
+    }
+
+    /**
      * Create a new journal entry
      * @param {Object} data - Entry data
      * @returns {Promise<Object>} Created entry
      */
     async create({ title, text, tag = 'personal', tags = null, mood = null, linkedTransaction = null }) {
-        const pubkey = authService.getPublicKey();
-        if (!pubkey) throw new Error('Not authenticated');
-
+        const owner = currentOwner();
         const tagList = Array.isArray(tags) && tags.length ? tags : (tag ? [tag] : []);
+        const createdAt = Math.floor(Date.now() / 1000);
 
-        // Create content object
-        const content = JSON.stringify({
-            title,
-            text,
-            mood,
-            tags: tagList,
-            updated_at: Math.floor(Date.now() / 1000)
-        });
-
-        // Encrypt content
-        const encryptedContent = await authService.encrypt(pubkey, content);
-
-        // Build event tags
-        const eventTags = [
-            ['p', pubkey],
-            ['app', 'nostr-zap-journal']
-        ];
-        const seen = new Set();
-        tagList.forEach(t => {
-            if (!seen.has(t)) {
-                seen.add(t);
-                eventTags.push(['t', t]);
-            }
-        });
-        if (!tagList.length && tag) eventTags.push(['t', tag]);
-
-        if (linkedTransaction) {
-            eventTags.push(['e', linkedTransaction]);
-        }
-
-        // Create unsigned event
-        const unsignedEvent = {
-            kind: config.kinds.ENCRYPTED_DM,
-            pubkey,
-            created_at: Math.floor(Date.now() / 1000),
-            tags: eventTags,
-            content: encryptedContent
-        };
-
-        // Sign and publish
-        const signedEvent = await authService.signEvent(unsignedEvent);
-        const result = await nostrService.publish(signedEvent);
-
-        if (result.successes.length === 0) {
-            throw new Error('Failed to publish journal entry');
-        }
-
-        // Create local entry
+        // Local-first: save immediately, publish later when a key is available.
         const entry = {
-            id: signedEvent.id,
+            id: `journal_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+            owner,
             title,
             text,
             tag: tagList[0] || tag,
             tags: tagList,
             mood,
             linkedTransaction,
-            created_at: signedEvent.created_at,
-            updated_at: signedEvent.created_at,
-            raw: signedEvent
+            created_at: createdAt,
+            updated_at: createdAt,
         };
 
-        // Update local state
         const entries = store.get('journal') || [];
         store.set('journal', [entry, ...entries]);
         await storageService.put('journal', entry);
+
+        await outbox.enqueue({
+            entity: 'journal',
+            entityId: entry.id,
+            op: 'upsert',
+            owner,
+            payload: {
+                title,
+                text,
+                mood,
+                tags: tagList,
+                tag: entry.tag,
+                linkedTransaction,
+                created_at: createdAt,
+            },
+            updatedAt: createdAt * 1000,
+        });
 
         eventBus.emit(Events.JOURNAL_UPDATED, { entry, action: 'create' });
         return entry;
@@ -268,25 +267,25 @@ class JournalService {
      * @returns {Promise<boolean>}
      */
     async delete(id) {
-        const pubkey = authService.getPublicKey();
-        if (!pubkey) throw new Error('Not authenticated');
+        const entry = this.getEntry(id);
+        if (!entry) return false;
 
-        // Create delete event (kind 5)
-        const unsignedEvent = {
-            kind: config.kinds.DELETE,
-            pubkey,
-            created_at: Math.floor(Date.now() / 1000),
-            tags: [['e', id]],
-            content: 'Deleted by user'
-        };
+        const owner = entry.owner || currentOwner();
 
-        const signedEvent = await authService.signEvent(unsignedEvent);
-        await nostrService.publish(signedEvent);
-
-        // Remove from local state
+        // Remove locally first (works offline / logged out)
         const entries = store.get('journal') || [];
         store.set('journal', entries.filter(e => e.id !== id));
         await storageService.delete('journal', id);
+
+        // Queue the kind 5 delete (needs eventId once the entry was published)
+        await outbox.enqueue({
+            entity: 'journal',
+            entityId: id,
+            op: 'delete',
+            owner,
+            payload: entry.eventId ? { eventId: entry.eventId } : null,
+            updatedAt: Date.now(),
+        });
 
         eventBus.emit(Events.JOURNAL_UPDATED, { id, action: 'delete' });
         return true;

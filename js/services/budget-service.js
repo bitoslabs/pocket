@@ -7,7 +7,9 @@
 
 import { config } from '../config.js';
 import { eventBus, Events } from '../core/event-bus.js';
+import { currentOwner, filterOwned } from '../core/account.js';
 import { storageService } from './storage-service.js';
+import { outbox } from './outbox.js';
 import { zapService } from './zap-service.js';
 
 class BudgetService {
@@ -32,7 +34,7 @@ class BudgetService {
      */
     async _loadBudgets() {
         try {
-            const budgets = await storageService.getAll('budgets');
+            const budgets = filterOwned(await storageService.getAll('budgets'), currentOwner());
             this._budgets = budgets || [];
             eventBus.emit(Events.BUDGETS_LOADED, { budgets: this._budgets });
         } catch (error) {
@@ -88,6 +90,7 @@ class BudgetService {
     async createBudget(budgetData) {
         const budget = {
             id: this._generateId(),
+            owner: currentOwner(),
             name: budgetData.name.trim(),
             categoryId: budgetData.categoryId,
             amount: parseFloat(budgetData.amount),
@@ -109,7 +112,16 @@ class BudgetService {
             
             // Add to memory
             this._budgets.push(budget);
-            
+
+            await outbox.enqueue({
+                entity: 'budget',
+                entityId: budget.id,
+                op: 'upsert',
+                owner: budget.owner,
+                payload: budget,
+                updatedAt: budget.updatedAt || Date.now(),
+            });
+
             // Emit event
             eventBus.emit(Events.BUDGET_CREATED, { budget });
             
@@ -143,7 +155,16 @@ class BudgetService {
             
             // Update in memory
             this._budgets[index] = budget;
-            
+
+            await outbox.enqueue({
+                entity: 'budget',
+                entityId: budget.id,
+                op: 'upsert',
+                owner: budget.owner || currentOwner(),
+                payload: budget,
+                updatedAt: budget.updatedAt || Date.now(),
+            });
+
             // Emit event
             eventBus.emit(Events.BUDGET_UPDATED, { budget });
             
@@ -165,12 +186,23 @@ class BudgetService {
             throw new Error('Budget not found');
         }
 
+        const removed = this._budgets[index];
+
         try {
             // Remove from storage
             await storageService.delete('budgets', id);
             
             // Remove from memory
             this._budgets.splice(index, 1);
+
+            await outbox.enqueue({
+                entity: 'budget',
+                entityId: id,
+                op: 'delete',
+                owner: removed.owner || currentOwner(),
+                payload: null,
+                updatedAt: Date.now(),
+            });
             
             // Emit event
             eventBus.emit(Events.BUDGET_DELETED, { budgetId: id });

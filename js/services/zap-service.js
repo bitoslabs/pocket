@@ -8,8 +8,10 @@
 import { config } from '../config.js';
 import { eventBus, Events } from '../core/event-bus.js';
 import { store } from '../core/state.js';
+import { currentOwner, filterOwned } from '../core/account.js';
 import { nostrService } from './nostr-service.js';
 import { storageService } from './storage-service.js';
+import { outbox } from './outbox.js';
 import { categoryService } from './category-service.js';
 import { recurringService } from './recurring-service.js';
 
@@ -25,8 +27,8 @@ class ZapService {
     async init(pubkey) {
         if (!pubkey) return;
 
-        // Load cached transactions
-        const cached = await storageService.getAll('transactions');
+        // Load cached transactions for this account only
+        const cached = filterOwned(await storageService.getAll('transactions'), pubkey);
         if (cached.length > 0) {
             store.set('transactions', cached);
         }
@@ -117,6 +119,7 @@ class ZapService {
 
         return {
             id: event.id,
+            owner: userPubkey,
             type,
             amount,
             sender: sender || 'Anonymous',
@@ -293,6 +296,7 @@ class ZapService {
     async createManualTransaction(transactionData) {
         const transaction = {
             id: this._generateTransactionId(),
+            owner: transactionData.owner || currentOwner(),
             type: transactionData.type || 'expense',
             amount: parseFloat(transactionData.amount),
             description: transactionData.description?.trim() || '',
@@ -320,6 +324,14 @@ class ZapService {
             const updated = [transaction, ...existing].sort((a, b) => b.created_at - a.created_at);
             store.set('transactions', updated);
             await storageService.put('transactions', transaction);
+            await outbox.enqueue({
+                entity: 'transaction',
+                entityId: transaction.id,
+                op: 'upsert',
+                owner: transaction.owner,
+                payload: transaction,
+                updatedAt: transaction.created_at || Date.now(),
+            });
 
             // Emit event
             eventBus.emit(Events.MANUAL_TRANSACTION_CREATED, { transaction });
@@ -356,6 +368,14 @@ class ZapService {
             transactions[index] = transaction;
             store.set('transactions', [...transactions]);
             await storageService.put('transactions', transaction);
+            await outbox.enqueue({
+                entity: 'transaction',
+                entityId: transaction.id,
+                op: 'upsert',
+                owner: transaction.owner || currentOwner(),
+                payload: transaction,
+                updatedAt: Date.now(),
+            });
 
             // Emit event
             eventBus.emit(Events.TRANSACTION_UPDATED, { transaction });
@@ -389,6 +409,14 @@ class ZapService {
             // Remove from state
             transactions.splice(index, 1);
             store.set('transactions', [...transactions]);
+            await outbox.enqueue({
+                entity: 'transaction',
+                entityId: transactionId,
+                op: 'delete',
+                owner: transaction.owner || currentOwner(),
+                payload: null,
+                updatedAt: Date.now(),
+            });
 
             // Emit event
             eventBus.emit(Events.TRANSACTION_DELETED, { transactionId, transaction });

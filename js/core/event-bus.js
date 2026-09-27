@@ -145,6 +145,13 @@ export const Events = {
     BUDGET_CLICKED: 'budget:clicked',
     CATEGORY_SELECTED: 'category:selected',
 
+    // Offline-first sync events
+    OUTBOX_CHANGED: 'outbox:changed',
+    SYNC_STARTED: 'sync:started',
+    SYNC_DONE: 'sync:done',
+    SYNC_ERROR: 'sync:error',
+    CONNECTION_CHANGED: 'connection:changed',
+
     // UI events
     TOAST_SHOW: 'toast:show',
     MODAL_OPEN: 'modal:open',

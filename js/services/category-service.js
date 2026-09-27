@@ -7,6 +7,8 @@
 
 import { config } from '../config.js';
 import { eventBus, Events } from '../core/event-bus.js';
+import { currentOwner, filterOwned } from '../core/account.js';
+import { outbox } from './outbox.js';
 import { storageService } from './storage-service.js';
 
 class CategoryService {
@@ -41,7 +43,10 @@ class CategoryService {
      */
     async _loadCategories() {
         try {
-            const customCategories = await storageService.getAll('categories');
+            const customCategories = filterOwned(
+                await storageService.getAll('categories'),
+                currentOwner()
+            );
             this._categories = [...this._defaultCategories, ...customCategories];
             eventBus.emit(Events.CATEGORIES_LOADED, { categories: this._categories });
         } catch (error) {
@@ -80,6 +85,7 @@ class CategoryService {
     async createCategory(categoryData) {
         const category = {
             id: this._generateId(),
+            owner: currentOwner(),
             name: categoryData.name.trim(),
             icon: categoryData.icon || '📌',
             color: categoryData.color || '#8C8C8C',
@@ -104,7 +110,16 @@ class CategoryService {
             
             // Add to memory
             this._categories.push(category);
-            
+
+            await outbox.enqueue({
+                entity: 'category',
+                entityId: category.id,
+                op: 'upsert',
+                owner: category.owner,
+                payload: category,
+                updatedAt: category.updatedAt || Date.now(),
+            });
+
             // Emit event
             eventBus.emit(Events.CATEGORY_CREATED, { category });
             
@@ -159,7 +174,16 @@ class CategoryService {
             
             // Update in memory
             this._categories[index] = updatedCategory;
-            
+
+            await outbox.enqueue({
+                entity: 'category',
+                entityId: updatedCategory.id,
+                op: 'upsert',
+                owner: updatedCategory.owner || currentOwner(),
+                payload: updatedCategory,
+                updatedAt: updatedCategory.updatedAt || Date.now(),
+            });
+
             // Emit event
             eventBus.emit(Events.CATEGORY_UPDATED, { category: updatedCategory });
             
@@ -192,7 +216,16 @@ class CategoryService {
             
             // Remove from memory
             this._categories = this._categories.filter(cat => cat.id !== id);
-            
+
+            await outbox.enqueue({
+                entity: 'category',
+                entityId: id,
+                op: 'delete',
+                owner: category.owner || currentOwner(),
+                payload: null,
+                updatedAt: Date.now(),
+            });
+
             // Emit event
             eventBus.emit(Events.CATEGORY_DELETED, { categoryId: id });
             

@@ -21,6 +21,7 @@ export const config = {
             'wss://nos.lol',
         ],
         timeout: 5000,
+        publishTimeout: 5000,
         maxRetries: 3,
         retryDelay: 1000
     },
@@ -46,7 +47,7 @@ export const config = {
             CATEGORIES: 'categories'
         },
         dbName: 'NostrZapJournalDB',
-        dbVersion: 2
+        dbVersion: 3
     },
 
     // UI settings

@@ -7,7 +7,9 @@
 
 import { config } from '../config.js';
 import { eventBus, Events } from '../core/event-bus.js';
+import { currentOwner, filterOwned } from '../core/account.js';
 import { storageService } from './storage-service.js';
+import { outbox } from './outbox.js';
 import { zapService } from './zap-service.js';
 
 class RecurringService {
@@ -33,7 +35,7 @@ class RecurringService {
     async _loadRecurringTransactions() {
         try {
             const recurring = await storageService.getAll('recurring');
-            this._recurringTransactions = recurring || [];
+            this._recurringTransactions = filterOwned(recurring, currentOwner());
             eventBus.emit(Events.RECURRING_LOADED, { recurring: this._recurringTransactions });
         } catch (error) {
             console.error('[RecurringService] Error loading recurring transactions:', error);
@@ -81,6 +83,7 @@ class RecurringService {
     async createRecurringTransaction(recurringData) {
         const recurring = {
             id: this._generateId(),
+            owner: currentOwner(),
             name: recurringData.name.trim(),
             description: recurringData.description || '',
             amount: parseFloat(recurringData.amount),
@@ -110,7 +113,16 @@ class RecurringService {
             
             // Add to memory
             this._recurringTransactions.push(recurring);
-            
+
+            await outbox.enqueue({
+                entity: 'recurring',
+                entityId: recurring.id,
+                op: 'upsert',
+                owner: recurring.owner || currentOwner(),
+                payload: recurring,
+                updatedAt: recurring.updatedAt || Date.now(),
+            });
+
             // Generate first transaction if due
             await this._generateTransactionIfDue(recurring);
             
@@ -156,7 +168,16 @@ class RecurringService {
             
             // Update in memory
             this._recurringTransactions[index] = recurring;
-            
+
+            await outbox.enqueue({
+                entity: 'recurring',
+                entityId: recurring.id,
+                op: 'upsert',
+                owner: recurring.owner || currentOwner(),
+                payload: recurring,
+                updatedAt: recurring.updatedAt || Date.now(),
+            });
+
             // Emit event
             eventBus.emit(Events.RECURRING_UPDATED, { recurring });
             
@@ -178,12 +199,23 @@ class RecurringService {
             throw new Error('Recurring transaction not found');
         }
 
+        const removed = this._recurringTransactions[index];
+
         try {
             // Remove from storage
             await storageService.delete('recurring', id);
             
             // Remove from memory
             this._recurringTransactions.splice(index, 1);
+
+            await outbox.enqueue({
+                entity: 'recurring',
+                entityId: id,
+                op: 'delete',
+                owner: removed.owner || currentOwner(),
+                payload: null,
+                updatedAt: Date.now(),
+            });
             
             // Emit event
             eventBus.emit(Events.RECURRING_DELETED, { recurringId: id });
@@ -237,6 +269,7 @@ class RecurringService {
                 // Create transaction
                 const transaction = {
                     id: this._generateTransactionId(),
+                    owner: recurring.owner || currentOwner(),
                     type: recurring.type,
                     amount: recurring.amount,
                     description: recurring.name,
@@ -249,7 +282,15 @@ class RecurringService {
 
                 // Save transaction through zap service (extend to support manual transactions)
                 await storageService.put('transactions', transaction);
-                
+                await outbox.enqueue({
+                    entity: 'transaction',
+                    entityId: transaction.id,
+                    op: 'upsert',
+                    owner: transaction.owner,
+                    payload: transaction,
+                    updatedAt: transaction.created_at || Date.now(),
+                });
+
                 // Add to generated transactions tracker
                 this._generatedTransactions.set(occurrenceId, true);
                 

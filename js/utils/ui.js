@@ -6,6 +6,7 @@
  */
 
 import { eventBus, Events } from '../core/event-bus.js';
+import { store } from '../core/state.js';
 import { priceService } from '../services/price-service.js';
 import { Icons } from './icons.js';
 
@@ -233,12 +234,13 @@ export function txRowHtml(tx, linkedIds = null) {
   const dir = income ? 'in' : 'out';
   const linked = linkedIds && linkedIds.has(tx.id);
   const fiat = priceService.showFiat ? priceService.fiatFor(tx) : '';
+  const pending = (store.get('sync')?.pendingIds || []).includes(`transaction:${tx.id}`);
   return `<button class="tx" data-action="edit-tx" data-id="${tx.id}">
     <span class="tx-ic" style="background:${meta.color}1F">
       <span class="ic" style="color:${meta.color}">${Icons[meta.icon] || Icons.file}</span>
     </span>
     <div class="tx-body">
-      <b>${escapeHtml(tx.description || meta.label)}</b>
+      <b>${escapeHtml(tx.description || meta.label)}${pending ? ' <i class="tx-pending" title="Waiting to sync"></i>' : ''}</b>
       <span>${meta.label} · ${fmtTime(tx.created_at)}${
     linked ? ' · <i class="tx-link">✎ journal</i>' : ''
   }</span>

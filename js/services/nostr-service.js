@@ -16,6 +16,7 @@ class NostrService {
         this._subscriptions = new Map(); // subscription id -> handlers
         this._messageQueue = new Map(); // relay url -> pending messages
         this._reconnectAttempts = new Map();
+        this._pendingPublishes = new Map(); // `${relayUrl}|${eventId}` -> { resolve }
     }
 
     /**
@@ -68,6 +69,7 @@ class NostrService {
                     this._messageQueue.set(url, []);
 
                     eventBus.emit(Events.RELAY_CONNECTED, { url });
+                    eventBus.emit(Events.CONNECTION_CHANGED, { online: true, relays: this.getConnectedRelays() });
                     resolve(ws);
                 };
 
@@ -89,6 +91,7 @@ class NostrService {
                     store.merge('relays', { connected });
 
                     eventBus.emit(Events.RELAY_DISCONNECTED, { url });
+                    eventBus.emit(Events.CONNECTION_CHANGED, { online: this.getConnectedRelays().length > 0, relays: this.getConnectedRelays() });
 
                     // Attempt reconnection
                     this._scheduleReconnect(url);
@@ -178,18 +181,56 @@ class NostrService {
         const message = JSON.stringify(['EVENT', event]);
         const results = { successes: [], failures: [] };
 
+        const relays = [];
         for (const [url, ws] of this._connections.entries()) {
-            try {
-                if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(message);
-                    results.successes.push(url);
-                } else {
-                    results.failures.push({ url, reason: 'Not connected' });
-                }
-            } catch (error) {
-                results.failures.push({ url, reason: error.message });
+            if (ws.readyState === WebSocket.OPEN) {
+                relays.push(url);
+            } else {
+                results.failures.push({ url, reason: 'Not connected' });
             }
         }
+
+        if (relays.length === 0) {
+            console.log(`[Nostr] Publish ${event.id?.slice(0, 8)}: no connected relays`);
+            return results;
+        }
+
+        // Wait for each relay's OK acknowledgment (or timeout) so the caller
+        // can safely mark an outbox entry as done only when truly accepted.
+        const timeout = config.relays.publishTimeout || 5000;
+        await Promise.all(
+            relays.map(
+                (url) =>
+                    new Promise((resolve) => {
+                        const key = `${url}|${event.id}`;
+                        const timer = setTimeout(() => {
+                            this._pendingPublishes.delete(key);
+                            results.failures.push({ url, reason: 'timeout' });
+                            resolve();
+                        }, timeout);
+
+                        this._pendingPublishes.set(key, (ok, msg) => {
+                            clearTimeout(timer);
+                            this._pendingPublishes.delete(key);
+                            if (ok) {
+                                results.successes.push(url);
+                            } else {
+                                results.failures.push({ url, reason: msg || 'rejected' });
+                            }
+                            resolve();
+                        });
+
+                        try {
+                            this._connections.get(url).send(message);
+                        } catch (error) {
+                            clearTimeout(timer);
+                            this._pendingPublishes.delete(key);
+                            results.failures.push({ url, reason: error.message });
+                            resolve();
+                        }
+                    })
+            )
+        );
 
         console.log(`[Nostr] Published event ${event.id?.slice(0, 8)}:`, results);
         return results;
@@ -227,6 +268,8 @@ class NostrService {
                 case 'OK': {
                     const [eventId, success, message] = rest;
                     console.log(`[Nostr] Event ${eventId.slice(0, 8)} ${success ? 'accepted' : 'rejected'}: ${message}`);
+                    const pending = this._pendingPublishes.get(`${url}|${eventId}`);
+                    if (pending) pending(success, message);
                     break;
                 }
 

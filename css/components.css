@@ -713,6 +713,20 @@
   font-weight: 700;
   flex: none;
 }
+.tx-pending {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  vertical-align: middle;
+  margin-left: 5px;
+  animation: tx-pend-pulse 1.6s ease-in-out infinite;
+}
+@keyframes tx-pend-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
 .tx-fiat {
   font-family: var(--font-family);
   font-size: 10px;

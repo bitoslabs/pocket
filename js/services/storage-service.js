@@ -22,7 +22,7 @@ class StorageService {
     async init() {
         if (this._initPromise) return this._initPromise;
 
-        this._initPromise = new Promise((resolve, reject) => {
+        this._initPromise = new Promise((resolve) => {
             if (!window.indexedDB) {
                 console.warn('[Storage] IndexedDB not supported, falling back to LocalStorage');
                 this._dbReady = false;
@@ -30,83 +30,96 @@ class StorageService {
                 return;
             }
 
-            // First, try to delete any existing database to ensure clean upgrade
-            const deleteRequest = indexedDB.deleteDatabase(config.storage.dbName);
-            deleteRequest.onsuccess = () => {
-                console.log('[Storage] Old database deleted, creating new one');
-            };
-            deleteRequest.onerror = () => {
-                console.warn('[Storage] Could not delete existing database');
-            };
-            deleteRequest.onblocked = () => {
-                console.warn('[Storage] Database deletion blocked');
+            const request = indexedDB.open(config.storage.dbName, config.storage.dbVersion);
+
+            request.onerror = () => {
+                console.error('[Storage] IndexedDB error:', request.error);
+                this._dbReady = false;
+                resolve(null);
             };
 
-            // Wait a bit for deletion to complete, then open new database
-            setTimeout(() => {
-                const request = indexedDB.open(config.storage.dbName, config.storage.dbVersion);
+            request.onsuccess = () => {
+                this._db = request.result;
+                this._dbReady = true;
+                console.log('[Storage] IndexedDB initialized');
+                resolve(this._db);
+            };
 
-                request.onerror = () => {
-                    console.error('[Storage] IndexedDB error:', request.error);
-                    this._dbReady = false;
-                    resolve(null);
-                };
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
 
-                request.onsuccess = () => {
-                    this._db = request.result;
-                    this._dbReady = true;
-                    console.log('[Storage] IndexedDB initialized');
-                    resolve(this._db);
-                };
+                // Create object stores
+                if (!db.objectStoreNames.contains('transactions')) {
+                    const txStore = db.createObjectStore('transactions', { keyPath: 'id' });
+                    txStore.createIndex('timestamp', 'created_at', { unique: false });
+                    txStore.createIndex('category', 'category', { unique: false });
+                    txStore.createIndex('owner', 'owner', { unique: false });
+                }
 
-                request.onupgradeneeded = (event) => {
-                    const db = event.target.result;
+                if (!db.objectStoreNames.contains('journal')) {
+                    const journalStore = db.createObjectStore('journal', { keyPath: 'id' });
+                    journalStore.createIndex('timestamp', 'created_at', { unique: false });
+                    journalStore.createIndex('tag', 'tag', { unique: false });
+                    journalStore.createIndex('owner', 'owner', { unique: false });
+                }
 
-                    // Create object stores
-                    if (!db.objectStoreNames.contains('transactions')) {
-                        const txStore = db.createObjectStore('transactions', { keyPath: 'id' });
-                        txStore.createIndex('timestamp', 'created_at', { unique: false });
-                        txStore.createIndex('category', 'category', { unique: false });
+                if (!db.objectStoreNames.contains('events')) {
+                    const eventsStore = db.createObjectStore('events', { keyPath: 'id' });
+                    eventsStore.createIndex('kind', 'kind', { unique: false });
+                    eventsStore.createIndex('pubkey', 'pubkey', { unique: false });
+                }
+
+                if (!db.objectStoreNames.contains('cache')) {
+                    db.createObjectStore('cache', { keyPath: 'key' });
+                }
+
+                // Create object stores for new features
+                if (!db.objectStoreNames.contains('categories')) {
+                    const categoriesStore = db.createObjectStore('categories', { keyPath: 'id' });
+                    categoriesStore.createIndex('type', 'type', { unique: false });
+                    categoriesStore.createIndex('name', 'name', { unique: false });
+                }
+
+                if (!db.objectStoreNames.contains('budgets')) {
+                    const budgetsStore = db.createObjectStore('budgets', { keyPath: 'id' });
+                    budgetsStore.createIndex('categoryId', 'categoryId', { unique: false });
+                    budgetsStore.createIndex('period', 'period', { unique: false });
+                }
+
+                if (!db.objectStoreNames.contains('recurring')) {
+                    const recurringStore = db.createObjectStore('recurring', { keyPath: 'id' });
+                    recurringStore.createIndex('frequency', 'frequency', { unique: false });
+                    recurringStore.createIndex('nextDue', 'nextDue', { unique: false });
+                    recurringStore.createIndex('isActive', 'isActive', { unique: false });
+                }
+
+                // Offline-first sync: queued mutations + per-account sync metadata
+                if (!db.objectStoreNames.contains('outbox')) {
+                    const outboxStore = db.createObjectStore('outbox', { keyPath: 'id' });
+                    outboxStore.createIndex('state', 'state', { unique: false });
+                    outboxStore.createIndex('entity', 'entity', { unique: false });
+                    outboxStore.createIndex('entityId', 'entityId', { unique: false });
+                }
+
+                if (!db.objectStoreNames.contains('meta')) {
+                    db.createObjectStore('meta', { keyPath: 'key' });
+                }
+
+                // Upgrade existing stores in place (non-destructive)
+                if (event.oldVersion > 0 && db.objectStoreNames.contains('transactions')) {
+                    const txStore = event.target.transaction.objectStore('transactions');
+                    if (!txStore.indexNames.contains('owner')) {
+                        txStore.createIndex('owner', 'owner', { unique: false });
                     }
-
-                    if (!db.objectStoreNames.contains('journal')) {
-                        const journalStore = db.createObjectStore('journal', { keyPath: 'id' });
-                        journalStore.createIndex('timestamp', 'created_at', { unique: false });
-                        journalStore.createIndex('tag', 'tag', { unique: false });
+                }
+                if (event.oldVersion > 0 && db.objectStoreNames.contains('journal')) {
+                    const journalStore = event.target.transaction.objectStore('journal');
+                    if (!journalStore.indexNames.contains('owner')) {
+                        journalStore.createIndex('owner', 'owner', { unique: false });
                     }
-
-                    if (!db.objectStoreNames.contains('events')) {
-                        const eventsStore = db.createObjectStore('events', { keyPath: 'id' });
-                        eventsStore.createIndex('kind', 'kind', { unique: false });
-                        eventsStore.createIndex('pubkey', 'pubkey', { unique: false });
-                    }
-
-                    if (!db.objectStoreNames.contains('cache')) {
-                        db.createObjectStore('cache', { keyPath: 'key' });
-                    }
-
-                    // Create object stores for new features
-                    if (!db.objectStoreNames.contains('categories')) {
-                        const categoriesStore = db.createObjectStore('categories', { keyPath: 'id' });
-                        categoriesStore.createIndex('type', 'type', { unique: false });
-                        categoriesStore.createIndex('name', 'name', { unique: false });
-                    }
-
-                    if (!db.objectStoreNames.contains('budgets')) {
-                        const budgetsStore = db.createObjectStore('budgets', { keyPath: 'id' });
-                        budgetsStore.createIndex('categoryId', 'categoryId', { unique: false });
-                        budgetsStore.createIndex('period', 'period', { unique: false });
-                    }
-
-                    if (!db.objectStoreNames.contains('recurring')) {
-                        const recurringStore = db.createObjectStore('recurring', { keyPath: 'id' });
-                        recurringStore.createIndex('frequency', 'frequency', { unique: false });
-                        recurringStore.createIndex('nextDue', 'nextDue', { unique: false });
-                        recurringStore.createIndex('isActive', 'isActive', { unique: false });
-                    }
-                };
-            }, 100); // Wait 100ms for deletion to complete
-            });
+                }
+            };
+        });
 
         return this._initPromise;
     }

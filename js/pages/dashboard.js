@@ -34,6 +34,7 @@ export class HomePage extends Component {
     this.watchStore('journal', () => this.render());
     this.watchStore('isAuthenticated', () => this.render());
     this.watchStore('price', () => this.render());
+    this.watchStore('sync', () => this.render());
   }
 
   template() {

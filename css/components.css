@@ -1995,6 +1995,262 @@
   }
 }
 
+/* ==================== App Loading Screen ==================== */
+
+.app-loader {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-lock);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 32px;
+  overflow: hidden;
+  background: radial-gradient(
+      620px 420px at 50% 16%,
+      var(--wash),
+      transparent 62%
+    ),
+    radial-gradient(520px 400px at 84% 90%, var(--zap-soft), transparent 60%),
+    var(--bg);
+  transition: opacity 420ms ease, transform 420ms cubic-bezier(0.4, 0, 0.2, 1),
+    visibility 0s linear 420ms;
+}
+
+.app-loader.is-hidden {
+  opacity: 0;
+  transform: scale(1.04);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* --- Mark + orbiting rings --- */
+.loader-stage {
+  position: relative;
+  width: 124px;
+  height: 124px;
+  display: grid;
+  place-items: center;
+  animation: loaderBob 3.6s ease-in-out infinite;
+}
+
+.loader-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 16%, transparent);
+  border-top-color: var(--accent-2);
+  border-right-color: color-mix(in srgb, var(--accent-2) 55%, transparent);
+  animation: loaderSpin 1.6s linear infinite;
+}
+
+.loader-ring--inner {
+  inset: 13px;
+  border-color: color-mix(in srgb, var(--zap) 13%, transparent);
+  border-bottom-color: var(--zap);
+  border-left-color: color-mix(in srgb, var(--zap) 55%, transparent);
+  animation-duration: 2.8s;
+  animation-direction: reverse;
+}
+
+.loader-orbit {
+  position: absolute;
+  inset: -8px;
+  animation: loaderSpin 3.4s linear infinite;
+}
+
+.loader-orbit i {
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: var(--zap);
+  box-shadow: 0 0 12px var(--zap);
+}
+
+.loader-mark {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  border-radius: 21px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  box-shadow: 0 18px 48px var(--accent-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  animation: loaderPop 620ms cubic-bezier(0.2, 0.9, 0.3, 1.35) both,
+    loaderGlow 2.6s ease-in-out 620ms infinite;
+}
+
+.loader-mark svg {
+  position: relative;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+}
+
+.loader-shine {
+  position: absolute;
+  inset: 0;
+  transform: translateX(-130%);
+  background: linear-gradient(
+    110deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 68%
+  );
+  animation: loaderShine 2.6s ease-in-out 300ms infinite;
+}
+
+/* --- Brand text --- */
+.loader-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.loader-brand h1 {
+  font-family: var(--disp);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: var(--letter-spacing-tight);
+  animation: loaderRise 520ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 80ms both;
+}
+
+.loader-brand h1 em {
+  font-style: normal;
+  color: var(--accent-2);
+}
+
+.loader-sub {
+  font-size: 13px;
+  color: var(--muted);
+  animation: loaderRise 520ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 180ms both;
+}
+
+/* --- Indeterminate progress --- */
+.loader-bar {
+  width: 152px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  overflow: hidden;
+  animation: loaderRise 520ms ease 260ms both;
+}
+
+.loader-bar span {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    var(--accent-deep),
+    var(--accent-2),
+    var(--zap)
+  );
+  animation: loaderSweep 1.5s cubic-bezier(0.65, 0.05, 0.36, 1) infinite;
+}
+
+@keyframes loaderPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes loaderBob {
+  0%,
+  100% {
+    transform: translateY(-4px);
+  }
+  50% {
+    transform: translateY(4px);
+  }
+}
+
+@keyframes loaderSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes loaderGlow {
+  0%,
+  100% {
+    box-shadow: 0 18px 40px var(--accent-soft),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  }
+  50% {
+    box-shadow: 0 22px 60px color-mix(in srgb, var(--accent) 55%, transparent),
+      0 0 26px var(--accent-soft), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+}
+
+@keyframes loaderShine {
+  0% {
+    transform: translateX(-130%);
+  }
+  60%,
+  100% {
+    transform: translateX(130%);
+  }
+}
+
+@keyframes loaderRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes loaderSweep {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(360%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader-ring,
+  .loader-orbit,
+  .loader-shine,
+  .loader-stage,
+  .loader-mark,
+  .loader-bar span {
+    animation: none;
+  }
+  .loader-shine {
+    display: none;
+  }
+  .loader-bar span {
+    width: 100%;
+  }
+}
+
 /* ==================== Lock Screen ==================== */
 
 .lockscr {

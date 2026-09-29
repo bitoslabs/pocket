@@ -66,4 +66,4 @@ Create a modern, premium Nostr Zap Journal web application using pure HTML, CSS,
 - LocalStorage for caching events
 - CSS Grid/Flexbox for layouts
 - CSS Variables for theming
-- No external dependencies (vanilla only)
+- No runtime dependencies except VanJS (vendored in `js/vendor/van.js`, MIT) for reactive UI; no build step

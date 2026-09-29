@@ -4,6 +4,9 @@
  * Resolves the maintainer's Lightning address (lud16/lud06) from their Nostr
  * kind 0 metadata and offers a one-tap donate flow.
  *
+ * VanJS view: `template()` returns DOM nodes built with `van.tags`, so profile
+ * fields are escaped automatically and no `hydrateIcons` pass is needed.
+ *
  * @module pages/about
  */
 
@@ -17,8 +20,11 @@ import {
   lightningUri,
   shortNpub,
 } from '../services/profile-service.js';
-import { Icons, hydrateIcons } from '../utils/icons.js';
+import { Icons } from '../utils/icons.js';
 import { copyText, toast } from '../utils/ui.js';
+import van from '../vendor/van.js';
+
+const { a, b, button, div, em, h2, h3, img, p, span } = van.tags;
 
 const NJUMP = 'https://njump.me/';
 
@@ -91,102 +97,124 @@ export class AboutPage extends Component {
     }
   }
 
-  _personHtml(npub, profile, copyAction) {
+  _icon(name) {
+    return span({ class: 'ic', innerHTML: Icons[name] || Icons.info });
+  }
+
+  _person(npub, profile, copyAction) {
     const name =
       profile?.display_name || profile?.name || (npub ? shortNpub(npub) : t('profile.anon'));
     const nip05 = String(profile?.nip05 || '').trim();
     const pic = this._safeUrl(profile?.picture);
     const initial = (name[0] || '?').toUpperCase();
 
-    return `
-      <div class="person">
-        ${
-          pic
-            ? `<span class="avatar avatar-sm"><img src="${this.escape(
-                pic
-              )}" alt="" loading="lazy" referrerpolicy="no-referrer" /></span>`
-            : `<span class="avatar avatar-sm" style="background:linear-gradient(135deg,var(--accent),var(--accent-deep))">${this.escape(
-                initial
-              )}</span>`
-        }
-        <div class="person-body">
-          <b>${this.escape(name)}</b>
-          <span>${this.escape(nip05 || shortNpub(npub))}</span>
-        </div>
-        ${
-          nip05
-            ? `<span class="badge badge-success" title="NIP-05 verified">${Icons.check}${this.escape(
-                nip05.split('@')[1] || 'NIP-05'
-              )}</span>`
-            : ''
-        }
-      </div>
-      <div class="about-links">
-        <button class="btn btn-outline btn-sm" data-action="${copyAction}" data-copy="${this.escape(
-      npub
-    )}">
-          <span class="ic">${Icons.copy}</span>${t('common.copyNpub')}
-        </button>
-        <a class="btn btn-ghost btn-sm" href="${NJUMP}${this.escape(
-      npub
-    )}" target="_blank" rel="noopener noreferrer">
-          <span class="ic">${Icons.external}</span>${t('common.viewOnNostr')}
-        </a>
-      </div>
-    `;
+    return [
+      div(
+        { class: 'person' },
+        pic
+          ? span(
+              { class: 'avatar avatar-sm' },
+              img({ src: pic, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' })
+            )
+          : span(
+              {
+                class: 'avatar avatar-sm',
+                style: 'background:linear-gradient(135deg,var(--accent),var(--accent-deep))',
+              },
+              initial
+            ),
+        div({ class: 'person-body' }, b(name), span(nip05 || shortNpub(npub))),
+        nip05
+          ? span(
+              { class: 'badge badge-success', title: 'NIP-05 verified' },
+              this._icon('check'),
+              nip05.split('@')[1] || 'NIP-05'
+            )
+          : null
+      ),
+      div(
+        { class: 'about-links' },
+        button(
+          { class: 'btn btn-outline btn-sm', 'data-action': copyAction, 'data-copy': npub },
+          this._icon('copy'),
+          t('common.copyNpub')
+        ),
+        a(
+          {
+            class: 'btn btn-ghost btn-sm',
+            href: `${NJUMP}${npub}`,
+            target: '_blank',
+            rel: 'noopener noreferrer',
+          },
+          this._icon('external'),
+          t('common.viewOnNostr')
+        )
+      ),
+    ];
   }
 
-  _donateHtml() {
+  _donate() {
     const owner = config.team.owner;
     const address = lightningAddressOf(this._profiles.owner);
+    const loading = this._loading;
 
     if (address) {
-      return `
-        <p class="about-lead">${t('about.supportMaintainer')}</p>
-        <div class="ln-box">
-          <span class="ln-label">${t('about.lightningAddress')}</span>
-          <b class="ln-addr">${this.escape(address)}</b>
-        </div>
-        <div class="about-links">
-          <button class="btn btn-primary" data-action="copy-ln" data-copy="${this.escape(address)}">
-            <span class="ic">${Icons.copy}</span>${t('about.copyAddress')}
-          </button>
-          <a class="btn btn-outline" href="${this.escape(lightningUri(address))}">
-            <span class="ic">${Icons.zap}</span>${t('about.openWallet')}
-          </a>
-        </div>`;
+      return [
+        p({ class: 'about-lead' }, t('about.supportMaintainer')),
+        div(
+          { class: 'ln-box' },
+          span({ class: 'ln-label' }, t('about.lightningAddress')),
+          b({ class: 'ln-addr' }, address)
+        ),
+        div(
+          { class: 'about-links' },
+          button(
+            { class: 'btn btn-primary', 'data-action': 'copy-ln', 'data-copy': address },
+            this._icon('copy'),
+            t('about.copyAddress')
+          ),
+          a(
+            { class: 'btn btn-outline', href: lightningUri(address) },
+            this._icon('zap'),
+            t('about.openWallet')
+          )
+        ),
+      ];
     }
 
-    const loading = this._loading;
-    return `
-      <p class="about-lead">${
-        loading ? t('about.lookingUp') : t('about.noLnAddress')
-      }</p>
-      <div class="ln-box ${loading ? 'is-loading' : ''}">
-        <span class="ln-label">${t('about.owner')}</span>
-        <b class="ln-addr">${loading ? t('about.resolving') : this.escape(shortNpub(owner))}</b>
-      </div>
-      <div class="about-links">
-        ${
-          loading
-            ? ''
-            : `<button class="btn btn-outline btn-sm" data-action="copy-owner" data-copy="${this.escape(
-                owner
-              )}">
-                 <span class="ic">${Icons.copy}</span>${t('common.copyNpub')}
-               </button>`
-        }
-        <a class="btn btn-ghost btn-sm" href="${NJUMP}${this.escape(
-      owner
-    )}" target="_blank" rel="noopener noreferrer">
-          <span class="ic">${Icons.zap}</span>${t('about.zapOnNostr')}
-        </a>
-        <button class="btn btn-ghost btn-sm" data-action="refresh-ln" ${
-          loading ? 'disabled' : ''
-        }>
-          <span class="ic">${Icons.spark}</span>${t('common.retry')}
-        </button>
-      </div>`;
+    return [
+      p({ class: 'about-lead' }, loading ? t('about.lookingUp') : t('about.noLnAddress')),
+      div(
+        { class: `ln-box ${loading ? 'is-loading' : ''}` },
+        span({ class: 'ln-label' }, t('about.owner')),
+        b({ class: 'ln-addr' }, loading ? t('about.resolving') : shortNpub(owner))
+      ),
+      div(
+        { class: 'about-links' },
+        loading
+          ? null
+          : button(
+              { class: 'btn btn-outline btn-sm', 'data-action': 'copy-owner', 'data-copy': owner },
+              this._icon('copy'),
+              t('common.copyNpub')
+            ),
+        a(
+          {
+            class: 'btn btn-ghost btn-sm',
+            href: `${NJUMP}${owner}`,
+            target: '_blank',
+            rel: 'noopener noreferrer',
+          },
+          this._icon('zap'),
+          t('about.zapOnNostr')
+        ),
+        button(
+          { class: 'btn btn-ghost btn-sm', 'data-action': 'refresh-ln', disabled: loading },
+          this._icon('spark'),
+          t('common.retry')
+        )
+      ),
+    ];
   }
 
   template() {
@@ -196,65 +224,73 @@ export class AboutPage extends Component {
       version: config.app.version,
     };
 
-    return `
-      <div class="view-title"><span class="ic">${Icons.info}</span>${t('about.title')}</div>
-
-      <div class="card about-hero">
-        <span class="about-mark"><img src="assets/icons/logo-mark.svg" alt="" /></span>
-        <h2 class="about-name">Zap<em>Journal</em></h2>
-        <p class="about-tagline">
-          ${t('about.tagline')}
-        </p>
-        <span class="badge badge-neutral">v${this.escape(version)}</span>
-        <div class="about-links">
-          <a class="btn btn-primary" href="${this.escape(
-            homepage
-          )}" target="_blank" rel="noopener noreferrer">
-            <span class="ic">${Icons.globe}</span>bitos.space
-          </a>
-          <a class="btn btn-outline" href="${this.escape(
-            repository
-          )}" target="_blank" rel="noopener noreferrer">
-            <span class="ic">${Icons.code}</span>${t('about.source')}
-          </a>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-head"><h3>${t('about.whatsInside')}</h3></div>
-        ${FEATURES.map(
-          (f) => `<div class="about-feature">
-            <span class="ic">${Icons[f.icon] || Icons.info}</span>
-            <span><b>${this.escape(t(f.titleKey))}</b><span>${this.escape(
-              t(f.textKey)
-            )}</span></span>
-          </div>`
-        ).join('')}
-      </div>
-
-      <div class="card">
-        <div class="card-head"><h3>${t('about.contributor')}</h3><span class="badge badge-primary">${t(
-      'about.core'
-    )}</span></div>
-        ${this._personHtml(config.team.contributor, this._profiles.contributor, 'copy-contributor')}
-      </div>
-
-      <div class="card about-donate">
-        <div class="card-head"><h3>${t('about.donate')}</h3><span class="badge">${Icons.zap}${t(
-      'common.sats'
-    )}</span></div>
-        ${this._donateHtml()}
-      </div>
-
-      <div class="card" style="padding:6px 16px">
-        <button class="set-row" data-action="force-update"><span class="ic">${Icons.undo}</span>
-          <span><b>${t('about.forceUpdate')}</b><span>${t('about.forceUpdateSub')}</span></span></button>
-      </div>
-
-      <p class="muted-p" style="margin-bottom:24px">
-        ZapJournal v${this.escape(version)} · ${t('about.footer')}
-      </p>
-    `;
+    const frag = document.createDocumentFragment();
+    van.add(
+      frag,
+      div({ class: 'view-title' }, this._icon('info'), t('about.title')),
+      div(
+        { class: 'card about-hero' },
+        span({ class: 'about-mark' }, img({ src: 'assets/icons/logo.svg', alt: '' })),
+        h2({ class: 'about-name' }, 'Pocket', em('Zap')),
+        p({ class: 'about-tagline' }, t('about.tagline')),
+        span({ class: 'badge badge-neutral' }, `v${version}`),
+        div(
+          { class: 'about-links' },
+          a(
+            { class: 'btn btn-primary', href: homepage, target: '_blank', rel: 'noopener noreferrer' },
+            this._icon('globe'),
+            'bitos.space'
+          ),
+          a(
+            { class: 'btn btn-outline', href: repository, target: '_blank', rel: 'noopener noreferrer' },
+            this._icon('code'),
+            t('about.source')
+          )
+        )
+      ),
+      div(
+        { class: 'card' },
+        div({ class: 'card-head' }, h3(t('about.whatsInside'))),
+        FEATURES.map((f) =>
+          div(
+            { class: 'about-feature' },
+            this._icon(f.icon),
+            span(b(t(f.titleKey)), span(t(f.textKey)))
+          )
+        )
+      ),
+      div(
+        { class: 'card' },
+        div(
+          { class: 'card-head' },
+          h3(t('about.contributor')),
+          span({ class: 'badge badge-primary' }, t('about.core'))
+        ),
+        this._person(config.team.contributor, this._profiles.contributor, 'copy-contributor')
+      ),
+      div(
+        { class: 'card about-donate' },
+        div(
+          { class: 'card-head' },
+          h3(t('about.donate')),
+          span({ class: 'badge' }, this._icon('zap'), t('common.sats'))
+        ),
+        this._donate()
+      ),
+      div(
+        { class: 'card', style: 'padding:6px 16px' },
+        button(
+          { class: 'set-row', 'data-action': 'force-update' },
+          this._icon('undo'),
+          span(b(t('about.forceUpdate')), span(t('about.forceUpdateSub')))
+        )
+      ),
+      p(
+        { class: 'muted-p', style: 'margin-bottom:24px' },
+        `${t('common.byBitOS')} · v${version} · ${t('about.footer')}`
+      )
+    );
+    return frag;
   }
 
   bindEvents() {
@@ -328,10 +364,6 @@ export class AboutPage extends Component {
       button.disabled = false;
       toast(t('about.updateFailed'), 'warning');
     }
-  }
-
-  afterRender() {
-    hydrateIcons(this.container);
   }
 }
 

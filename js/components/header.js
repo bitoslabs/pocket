@@ -1,5 +1,5 @@
 /**
- * Topbar Component - ZapJournal
+ * Topbar Component - PocketZap
  * Brand, search and lock action.
  *
  * VanJS view: the search field stays uncontrolled (so typing is never
@@ -155,9 +155,9 @@ export class Header extends Component {
       this._desktop.val
         ? ''
         : a(
-            { class: 'brand', href: '#home', 'aria-label': 'ZapJournal' },
-            span({ class: 'brand-mark' }, img({ src: 'assets/icons/logo-mark.svg', alt: '' })),
-            span({ class: 'brand-name' }, 'Zap', em('Journal'))
+            { class: 'brand', href: '#home', 'aria-label': 'PocketZap' },
+            span({ class: 'brand-mark' }, img({ src: 'assets/icons/logo.svg', alt: '' })),
+            span({ class: 'brand-name' }, 'Pocket', em('Zap'))
           );
 
     const searchWrap = div(

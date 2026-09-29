@@ -1,5 +1,5 @@
 /**
- * Sidebar Component - ZapJournal (desktop navigation)
+ * Sidebar Component - PocketZap (desktop navigation)
  *
  * VanJS view: nav highlight and the monthly balance are bound through
  * `storeState()`, so they update in place without re-rendering the sidebar.
@@ -50,9 +50,9 @@ export class Sidebar extends Component {
 
     return [
       a(
-        { class: 'side-brand', href: '#home', 'aria-label': 'ZapJournal' },
-        span({ class: 'brand-mark' }, img({ src: 'assets/icons/logo-mark.svg', alt: '' })),
-        span({ class: 'brand-name' }, 'Zap', em('Journal'))
+        { class: 'side-brand', href: '#home', 'aria-label': 'PocketZap' },
+        span({ class: 'brand-mark' }, img({ src: 'assets/icons/logo-motion.svg', alt: '' })),
+        span({ class: 'brand-name' }, 'Pocket', em('Zap'))
       ),
       nav({ class: 'side-nav' }, NAV.map(navLink)),
       button(

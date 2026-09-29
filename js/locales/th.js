@@ -6,8 +6,9 @@
 
 export default {
   common: {
-    appName: 'ZapJournal',
-    tagline: 'ไดอารี่ส่วนตัวและตัวติดตามซาโตชิบน Nostr',
+    appName: 'PocketZap',
+    tagline: 'ไดอารี่แซปส่วนตัว โดย bitOS',
+    byBitOS: 'PocketZap โดย bitOS',
     cancel: 'ยกเลิก',
     save: 'บันทึก',
     delete: 'ลบ',
@@ -50,7 +51,7 @@ export default {
 
   loader: {
     loading: 'กำลังโหลดมุมส่วนตัวของคุณ…',
-    aria: 'กำลังโหลด ZapJournal',
+    aria: 'กำลังโหลด PocketZap',
   },
 
   header: {
@@ -79,7 +80,7 @@ export default {
     privateCorner: 'มุมส่วนตัวของคุณ',
     localModeTitle: 'โหมดในเครื่อง',
     localModeBody:
-      'คุณใช้ ZapJournal ได้โดยไม่ต้องมีบัญชี — ทุกอย่างถูกเก็บไว้ในเครื่องนี้ ข้อมูลจะยังไม่ถูกเข้ารหัสจนกว่าคุณจะเชื่อมต่อ Nostr และจะซิงก์อัตโนมัติหลังจากเข้าสู่ระบบ',
+      'คุณใช้ PocketZap ได้โดยไม่ต้องมีบัญชี — ทุกอย่างถูกเก็บไว้ในเครื่องนี้ ข้อมูลจะยังไม่ถูกเข้ารหัสจนกว่าคุณจะเชื่อมต่อ Nostr และจะซิงก์อัตโนมัติหลังจากเข้าสู่ระบบ',
     connectTitle: 'เชื่อมต่อ Nostr',
     connectBody: 'เข้าสู่ระบบเพื่อซิงก์แซปและเข้ารหัสบันทึกไดอารี่',
     connectButton: 'เชื่อมต่อด้วย Nostr',
@@ -280,13 +281,13 @@ export default {
     editProfile: 'แก้ไขโปรไฟล์',
     nameBio: 'ชื่อและ bio',
     appLock: 'ล็อกแอป',
-    pinRequired: 'ต้องใช้ PIN เพื่อเปิด ZapJournal',
+    pinRequired: 'ต้องใช้ PIN เพื่อเปิด PocketZap',
     offNoPin: 'ปิด · ไม่ต้องใช้ PIN',
     changePin: 'เปลี่ยน PIN',
     reLock: 'ล็อกไดอารี่อีกครั้งด้วยรหัสใหม่',
     export: 'ส่งออกข้อมูล',
     exportSub: 'ดาวน์โหลดทุกอย่างเป็น JSON — ดูแลด้วยตัวเอง',
-    aboutApp: 'เกี่ยวกับ ZapJournal',
+    aboutApp: 'เกี่ยวกับ PocketZap',
     aboutSub: 'ผู้ร่วมพัฒนา ซอร์ส และบริจาค',
     reset: 'รีเซ็ตแอป',
     resetSub: 'ลบบันทึกและรายการทั้งหมด',
@@ -295,7 +296,7 @@ export default {
       'การดำเนินการนี้จะลบบันทึก รายการ และการตั้งค่าในเครื่องทั้งหมด และย้อนกลับไม่ได้',
     resetConfirm: 'รีเซ็ตทั้งหมด',
     lockOffTitle: 'ปิดล็อกแอป',
-    lockOffMessage: 'ZapJournal จะเปิดโดยไม่ต้องใช้ PIN บนอุปกรณ์นี้',
+    lockOffMessage: 'PocketZap จะเปิดโดยไม่ต้องใช้ PIN บนอุปกรณ์นี้',
     lockOffConfirm: 'ปิด',
     displayName: 'ชื่อที่แสดง',
     bio: 'bio',
@@ -314,7 +315,7 @@ export default {
     backupKeySub: 'ดู คัดลอก หรือดาวน์โหลดคีย์ลับ (nsec)',
     keyManagedByExt: 'จัดการโดยส่วนขยายเบราว์เซอร์ของคุณ',
     keyManagedByExtBody:
-      'คุณเข้าสู่ระบบด้วยส่วนขยายเบราว์เซอร์ (NIP-07) คีย์ลับจึงไม่ออกจากส่วนขยาย สำรองคีย์ได้จากส่วนขยายหรือกระเป๋าเงินของคุณ — ZapJournal ไม่สามารถมองเห็นได้',
+      'คุณเข้าสู่ระบบด้วยส่วนขยายเบราว์เซอร์ (NIP-07) คีย์ลับจึงไม่ออกจากส่วนขยาย สำรองคีย์ได้จากส่วนขยายหรือกระเป๋าเงินของคุณ — PocketZap ไม่สามารถมองเห็นได้',
     secretWarningTitle: 'เก็บเป็นความลับ',
     secretWarningBody:
       'ใครก็ตามที่มีคีย์ลับของคุณจะควบคุมบัญชีนี้ได้ อย่าแชร์ให้ใคร เก็บไว้ในที่ปลอดภัยและออฟไลน์',
@@ -328,7 +329,7 @@ export default {
     backupDownloaded: 'ดาวน์โหลดสำรองแล้ว — คีย์ของคุณ ข้อมูลของคุณ ⚡',
     relayMustWss: 'URL รีเลย์ต้องขึ้นต้นด้วย wss://',
     relayAdded: 'เพิ่มรีเลย์แล้ว',
-    footer: 'ส่วนตัว · เก็บในเครื่องก่อน',
+    footer: 'ขับเคลื่อนโดยเศรษฐกิจสังคมแบบเปิด',
     language: 'ภาษา',
     languageSub: 'ภาษาที่แสดงในแอป',
   },
@@ -336,7 +337,7 @@ export default {
   about: {
     title: 'เกี่ยวกับ',
     tagline:
-      'ไดอารี่ส่วนตัวและตัวติดตามซาโตชิบน Nostr เก็บในเครื่องก่อน ดูแลคีย์เอง เป็นของคุณ',
+      'ไดอารี่แซปส่วนตัว โดย bitOS',
     source: 'ซอร์สโค้ด',
     whatsInside: 'มีอะไรบ้าง',
     featurePrivateTitle: 'ไดอารี่ส่วนตัว',
@@ -347,7 +348,7 @@ export default {
     featureOfflineText: 'ติดตั้งเป็น PWA ได้ เก็บในเครื่องก่อน ส่งออกทุกอย่างได้ทุกเมื่อ',
     forceUpdate: 'บังคับอัปเดต',
     forceUpdateSub: 'ล้างไฟล์แอปที่แคชไว้และโหลดเวอร์ชันล่าสุด',
-    updateOffline: 'เชื่อมต่ออินเทอร์เน็ตเพื่ออัปเดต ZapJournal',
+    updateOffline: 'เชื่อมต่ออินเทอร์เน็ตเพื่ออัปเดต PocketZap',
     updateInstalling: 'กำลังติดตั้งเวอร์ชันล่าสุด…',
     updateReloading: 'กำลังโหลดเวอร์ชันล่าสุด…',
     updateFailed: 'ตรวจสอบการอัปเดตไม่ได้ โปรดลองอีกครั้ง',
@@ -367,7 +368,7 @@ export default {
     copyOwner: 'คัดลอก npub เจ้าของแล้ว',
     lnCopied: 'คัดลอก Lightning address แล้ว ⚡',
     stillNoLn: 'ยังไม่พบ Lightning address',
-    footer: 'สร้างโดย bitos.space · จิตวิญญาณ MIT ดูแลคีย์ด้วยตัวเองตลอดไป',
+    footer: 'ขับเคลื่อนโดยเศรษฐกิจสังคมแบบเปิด',
   },
 
   lock: {

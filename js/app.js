@@ -1,6 +1,6 @@
 /**
  * Main Application
- * Entry point and orchestration for ZapJournal
+ * Entry point and orchestration for PocketZap
  *
  * @module app
  */
@@ -31,7 +31,6 @@ import { Sidebar } from './components/sidebar.js';
 import { Dock } from './components/tabbar.js';
 import { Rail } from './components/rail.js';
 import { lock } from './components/lock.js';
-import { hydrateIcons } from './utils/icons.js';
 import { openQuickAdd } from './components/quick-add.js';
 import './components/toast.js';
 import './components/modal.js';
@@ -195,9 +194,6 @@ class App {
                 this._header?.openSearch();
             }
         });
-
-        // Hydrate any static [data-icon] nodes (loading + lock screens)
-        hydrateIcons(document);
     }
 }
 

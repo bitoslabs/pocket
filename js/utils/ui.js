@@ -8,16 +8,6 @@
 import { eventBus, Events } from '../core/event-bus.js';
 import { t, locale } from '../core/i18n.js';
 import { priceService } from '../services/price-service.js';
-import { Icons } from './icons.js';
-import { escapeHtml } from './html.js';
-
-export { escapeHtml };
-
-export const $ = (sel, ctx = document) => ctx.querySelector(sel);
-export const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
-
-export const uid = () =>
-  Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
 /* ==================== Time ==================== */
 
@@ -27,17 +17,11 @@ export function toMs(ts) {
   return ts < 1e12 ? ts * 1000 : ts;
 }
 
-export const nowSec = () => Math.floor(Date.now() / 1000);
-
 export function fmtTime(ts) {
   return new Date(toMs(ts)).toLocaleTimeString([], {
     hour: 'numeric',
     minute: '2-digit',
   });
-}
-
-export function fmtDate(ts, opts = {}) {
-  return new Date(toMs(ts)).toLocaleDateString(locale(), opts);
 }
 
 export function dayLabel(ts) {
@@ -142,13 +126,6 @@ export function categoryMeta(id) {
   return { ...meta, label: label === key ? meta.label : label };
 }
 
-export function categoryIcon(id) {
-  const meta = categoryMeta(id);
-  return Icons[meta.icon] || Icons.file;
-}
-
-export { CATEGORY_META };
-
 /* ==================== Moods ==================== */
 
 export const MOODS = [
@@ -224,12 +201,6 @@ export function shortNpub(n = '') {
   return n.length > 16 ? n.slice(0, 8) + '…' + n.slice(-4) : n;
 }
 
-export function hueOf(str = '') {
-  let h = 0;
-  for (const c of str) h = (h * 31 + c.charCodeAt(0)) % 360;
-  return h;
-}
-
 /* ==================== Rendering helpers ==================== */
 
 export function greeting(hour = new Date().getHours()) {
@@ -243,13 +214,6 @@ export function greeting(hour = new Date().getHours()) {
 export function fiatLabel(sats) {
   return priceService.showFiat ? priceService.formatFiat(sats) : '';
 }
-
-/** Fiat string for a stored item (uses recorded fiat if present). */
-export function fiatForItem(item) {
-  return priceService.showFiat ? priceService.fiatFor(item) : '';
-}
-
-export const fiatEnabled = () => priceService.showFiat;
 
 /** Group items by calendar day; returns [{ key, items }] */
 export function groupByDay(items, tsFn = (t) => t.created_at) {

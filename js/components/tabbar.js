@@ -1,5 +1,5 @@
 /**
- * Dock Component - ZapJournal (mobile / tablet navigation)
+ * Dock Component - PocketZap (mobile / tablet navigation)
  * Replaces the legacy tab bar. Includes the centre FAB.
  *
  * Reference VanJS component: `template()` returns DOM nodes and the active

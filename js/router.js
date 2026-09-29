@@ -339,13 +339,4 @@ export function routeTo(path, params = {}) {
     router.navigate(path, params);
 }
 
-// Helper: Create link element with routing
-export function createRouterLink(path, text, className = '') {
-    const link = document.createElement('a');
-    link.href = `#${path}`;
-    link.textContent = text;
-    if (className) link.className = className;
-    return link;
-}
-
 export default router;

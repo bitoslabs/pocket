@@ -1,5 +1,5 @@
 /**
- * i18n - lightweight internationalisation for ZapJournal.
+ * i18n - lightweight internationalisation for PocketZap.
  *
  * Two ways to translate:
  *   1. In JS templates call `t('nav.today')` (supports `{token}` interpolation).

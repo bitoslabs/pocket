@@ -1,5 +1,5 @@
 /**
- * Layout System - ZapJournal
+ * Layout System - PocketZap
  * App shell, sidebar, topbar, dock, rail + utility classes
  */
 
@@ -141,6 +141,12 @@ a.side-brand:active {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* The sidebar mark is transparent and animated, so it carries no tile or glow. */
+.side-brand .brand-mark {
+  background: transparent;
+  box-shadow: none;
 }
 
 .brand-name {

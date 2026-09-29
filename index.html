@@ -8,7 +8,7 @@
     />
     <meta
       name="description"
-      content="ZapJournal — a private journal and Lightning sats tracker on Nostr"
+      content="PocketZap — a personal zap journal by bitOS"
       data-i18n-content="common.tagline"
     />
     <meta name="theme-color" content="#0B0912" id="themeColorMeta" />
@@ -21,10 +21,10 @@
 
     <!-- PWA -->
     <link rel="manifest" href="manifest.json" />
-    <link rel="icon" type="image/svg+xml" href="assets/icons/logo-mark.svg" />
+    <link rel="icon" type="image/svg+xml" href="assets/icons/logo-icon.svg" />
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
 
-    <title>ZapJournal 🔒 — Private Journal & Sats</title>
+    <title>PocketZap 🔒 — Private Journal & Sats</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -94,16 +94,13 @@
       data-i18n-aria-label="loader.aria"
     >
       <div class="loader-stage">
-        <span class="loader-orbit" aria-hidden="true"><i></i></span>
-        <span class="loader-ring" aria-hidden="true"></span>
-        <span class="loader-ring loader-ring--inner" aria-hidden="true"></span>
         <div class="loader-mark">
           <span class="loader-shine" aria-hidden="true"></span>
-          <img src="assets/icons/logo-mark.svg" alt="" />
+          <img src="assets/icons/logo-motion.svg" alt="" />
         </div>
       </div>
       <div class="loader-brand">
-        <h1>Zap<em>Journal</em></h1>
+        <h1>Pocket<em>Zap</em></h1>
         <div class="loader-sub" data-i18n="loader.loading">Loading your private corner…</div>
       </div>
       <div class="loader-bar" aria-hidden="true"><span></span></div>
@@ -136,46 +133,7 @@
     <!-- Toasts -->
     <div class="toasts" id="toasts" aria-live="polite"></div>
 
-    <!-- Lock Screen -->
-    <div class="lockscr" id="lockscr" role="dialog" aria-modal="true" hidden>
-      <div class="lock-brand">
-        <span class="lock-mark"><img src="assets/icons/logo-mark.svg" alt="" /></span>
-        <h1>Zap<em>Journal</em></h1>
-      </div>
-      <div class="lock-title" id="lockTitle" data-i18n="lock.createTitle">
-        Create your PIN
-      </div>
-      <div class="lock-sub" id="lockSub" data-i18n="lock.createSub">
-        4 digits · keeps your journal private on this device
-      </div>
-      <div class="pin-dots" id="pinDots">
-        <span class="pdot"></span><span class="pdot"></span
-        ><span class="pdot"></span><span class="pdot"></span>
-      </div>
-      <div class="keypad" id="keypad">
-        <button class="key" data-key="1">1</button>
-        <button class="key" data-key="2">2</button>
-        <button class="key" data-key="3">3</button>
-        <button class="key" data-key="4">4</button>
-        <button class="key" data-key="5">5</button>
-        <button class="key" data-key="6">6</button>
-        <button class="key" data-key="7">7</button>
-        <button class="key" data-key="8">8</button>
-        <button class="key" data-key="9">9</button>
-        <button class="key ghost" aria-hidden="true"></button>
-        <button class="key" data-key="0">0</button>
-        <button class="key" data-key="back" data-i18n-aria-label="lock.delete" aria-label="Delete">
-          <span class="ic" data-icon="back"></span>
-        </button>
-      </div>
-      <div class="lock-foot">
-        <span data-i18n="lock.privateByDesign"
-          >Private by design · data never leaves this device</span
-        ><br />
-        <button id="forgotPin" data-i18n="lock.forgot" hidden>Forgot PIN?</button>
-        <button id="lockCancel" data-i18n="lock.notNow" hidden>Not now</button>
-      </div>
-    </div>
+    <!-- Lock screen is built by js/components/lock.js (VanJS) -->
 
     <!-- Crypto Dependencies -->
     <script src="https://unpkg.com/nostr-tools@1.17.0/lib/nostr.bundle.js"></script>

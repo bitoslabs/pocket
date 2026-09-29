@@ -1,5 +1,5 @@
 /**
- * Components - ZapJournal
+ * Components - PocketZap
  * Cards, ledger, journal, money, profile, modals, lock screen, toasts, forms
  */
 
@@ -2098,7 +2098,7 @@
   pointer-events: none;
 }
 
-/* --- Mark + orbiting rings --- */
+/* --- Mark --- */
 .loader-stage {
   position: relative;
   width: 124px;
@@ -2108,48 +2108,11 @@
   animation: loaderBob 3.6s ease-in-out infinite;
 }
 
-.loader-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 2px solid color-mix(in srgb, var(--accent) 16%, transparent);
-  border-top-color: var(--accent-2);
-  border-right-color: color-mix(in srgb, var(--accent-2) 55%, transparent);
-  animation: loaderSpin 1.6s linear infinite;
-}
-
-.loader-ring--inner {
-  inset: 13px;
-  border-color: color-mix(in srgb, var(--zap) 13%, transparent);
-  border-bottom-color: var(--zap);
-  border-left-color: color-mix(in srgb, var(--zap) 55%, transparent);
-  animation-duration: 2.8s;
-  animation-direction: reverse;
-}
-
-.loader-orbit {
-  position: absolute;
-  inset: -8px;
-  animation: loaderSpin 3.4s linear infinite;
-}
-
-.loader-orbit i {
-  position: absolute;
-  top: -1px;
-  left: 50%;
-  width: 7px;
-  height: 7px;
-  margin-left: -3.5px;
-  border-radius: 50%;
-  background: var(--zap);
-  box-shadow: 0 0 12px var(--zap);
-}
-
 .loader-mark {
   position: relative;
-  width: 68px;
-  height: 68px;
-  border-radius: 21px;
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -2257,12 +2220,6 @@
   }
 }
 
-@keyframes loaderSpin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 @keyframes loaderGlow {
   0%,
   100% {
@@ -2306,8 +2263,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .loader-ring,
-  .loader-orbit,
   .loader-shine,
   .loader-stage,
   .loader-mark,

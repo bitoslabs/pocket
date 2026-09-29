@@ -9,8 +9,9 @@
 
 export default {
   common: {
-    appName: 'ZapJournal',
-    tagline: 'Private journal & Lightning sats tracker on Nostr',
+    appName: 'PocketZap',
+    tagline: 'A personal zap journal by bitOS.',
+    byBitOS: 'PocketZap by bitOS',
     cancel: 'Cancel',
     save: 'Save',
     delete: 'Delete',
@@ -53,7 +54,7 @@ export default {
 
   loader: {
     loading: 'Loading your private corner…',
-    aria: 'Loading ZapJournal',
+    aria: 'Loading PocketZap',
   },
 
   header: {
@@ -82,7 +83,7 @@ export default {
     privateCorner: 'your private corner',
     localModeTitle: 'Local mode',
     localModeBody:
-      'You can use ZapJournal without an account — everything is saved on this device. Data stays unencrypted until you connect Nostr, and syncs automatically after you log in.',
+      'You can use PocketZap without an account — everything is saved on this device. Data stays unencrypted until you connect Nostr, and syncs automatically after you log in.',
     connectTitle: 'Connect Nostr',
     connectBody: 'Log in to sync your zaps and encrypt journal entries.',
     connectButton: 'Connect with Nostr',
@@ -283,13 +284,13 @@ export default {
     editProfile: 'Edit profile',
     nameBio: 'Name & bio',
     appLock: 'App lock',
-    pinRequired: 'PIN required to open ZapJournal',
+    pinRequired: 'PIN required to open PocketZap',
     offNoPin: 'Off · no PIN required',
     changePin: 'Change PIN',
     reLock: 'Re-lock your journal with a new code',
     export: 'Export data',
     exportSub: 'Download everything as JSON — self-custody',
-    aboutApp: 'About ZapJournal',
+    aboutApp: 'About PocketZap',
     aboutSub: 'Contributors, source & donate',
     reset: 'Reset app',
     resetSub: 'Wipe all entries & transactions',
@@ -298,7 +299,7 @@ export default {
       'This wipes all local entries, transactions and settings. This cannot be undone.',
     resetConfirm: 'Reset everything',
     lockOffTitle: 'Turn off app lock',
-    lockOffMessage: 'ZapJournal will open without a PIN on this device.',
+    lockOffMessage: 'PocketZap will open without a PIN on this device.',
     lockOffConfirm: 'Turn off',
     displayName: 'Display name',
     bio: 'Bio',
@@ -317,7 +318,7 @@ export default {
     backupKeySub: 'Reveal, copy or download your secret key (nsec)',
     keyManagedByExt: 'Managed by your browser extension',
     keyManagedByExtBody:
-      'You signed in with a browser extension (NIP-07), so your secret key never leaves the extension. Back it up from your extension or wallet — ZapJournal cannot see it.',
+      'You signed in with a browser extension (NIP-07), so your secret key never leaves the extension. Back it up from your extension or wallet — PocketZap cannot see it.',
     secretWarningTitle: 'Keep this private',
     secretWarningBody:
       'Anyone with your secret key controls this account. Never share it. Store it somewhere safe and offline.',
@@ -331,15 +332,27 @@ export default {
     backupDownloaded: 'Backup downloaded — your keys, your data ⚡',
     relayMustWss: 'Relay URL must start with wss://',
     relayAdded: 'Relay added',
-    footer: 'private · local-first',
+    footer: 'Powered by the open social economy.',
     language: 'Language',
     languageSub: 'App display language',
+    categories: 'Categories',
+    addCategory: 'Add category',
+    newCategory: 'New category',
+    categoryName: 'Category name',
+    categoryIcon: 'Icon',
+    categoryColor: 'Color',
+    categoryType: 'Type',
+    categoryBoth: 'Both',
+    deleteCategoryTitle: 'Delete category?',
+    deleteCategoryMessage: 'Transactions using it will become uncategorized. This cannot be undone.',
+    categoryCreated: 'Category created',
+    categoryDeleted: 'Category deleted',
   },
 
   about: {
     title: 'About',
     tagline:
-      'A private journal and Lightning sats tracker on Nostr. Local-first, self-custodial, yours.',
+      'A personal zap journal by bitOS.',
     source: 'Source',
     whatsInside: "What's inside",
     featurePrivateTitle: 'Private journal',
@@ -350,7 +363,7 @@ export default {
     featureOfflineText: 'Installable PWA, local-first, export everything anytime.',
     forceUpdate: 'Force update',
     forceUpdateSub: 'Clear cached app files and load the latest version',
-    updateOffline: 'Connect to the internet to update ZapJournal',
+    updateOffline: 'Connect to the internet to update PocketZap',
     updateInstalling: 'Installing the latest version…',
     updateReloading: 'Loading the latest version…',
     updateFailed: 'Could not check for an update. Please try again.',
@@ -370,7 +383,7 @@ export default {
     copyOwner: 'Owner npub copied',
     lnCopied: 'Lightning address copied ⚡',
     stillNoLn: 'Still no Lightning address found',
-    footer: 'built by bitos.space · MIT-spirited, self-custody forever',
+    footer: 'Powered by the open social economy.',
   },
 
   lock: {

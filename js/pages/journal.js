@@ -1,6 +1,9 @@
 /**
  * Journal Page - private timeline of encrypted entries
  *
+ * VanJS view: `template()` returns DOM nodes built with `van.tags`, so entry
+ * text and tags are escaped automatically and no `hydrateIcons` pass is needed.
+ *
  * @module pages/journal
  */
 
@@ -9,11 +12,10 @@ import { store } from '../core/state.js';
 import { t, locale } from '../core/i18n.js';
 import { journalService } from '../services/journal-service.js';
 import { modal } from '../components/modal.js';
-import { Icons, hydrateIcons } from '../utils/icons.js';
+import { Icons } from '../utils/icons.js';
 import {
   categoryMeta,
   dayLabel,
-  escapeHtml,
   fiatLabel,
   fmtSats,
   groupByDay,
@@ -25,6 +27,9 @@ import {
 } from '../utils/ui.js';
 import { openComposer } from '../components/journal-composer.js';
 import { openTxModal } from '../components/tx-modal.js';
+import van from '../vendor/van.js';
+
+const { article, button, div, h3, p, span, textarea } = van.tags;
 
 export class JournalPage extends Component {
   mounted() {
@@ -37,71 +42,76 @@ export class JournalPage extends Component {
 
   template() {
     const authenticated = store.get('isAuthenticated');
-    const banner = authenticated ? '' : this._guestBanner();
-
     const query = store.get('ui.query') || '';
-    const all = (store.get('journal') || []).slice().sort(
-      (a, b) => toMs(b.created_at) - toMs(a.created_at)
-    );
+    const all = (store.get('journal') || [])
+      .slice()
+      .sort((a, b) => toMs(b.created_at) - toMs(a.created_at));
     const entries = all.filter((e) => {
       if (!query) return true;
       const hay = `${e.title || ''} ${e.text || ''} ${(this._tagsOf(e) || []).join(' ')}`.toLowerCase();
       return hay.includes(query);
     });
+    const transactions = store.get('transactions') || [];
+
+    const frag = document.createDocumentFragment();
+    van.add(
+      frag,
+      this._title(authenticated),
+      authenticated ? null : this._guestBanner()
+    );
 
     if (!entries.length) {
-      return `
-        <div class="view-title">${t('journal.title')} <span class="priv-pill">${Icons.eyeOff} ${
-        authenticated ? t('journal.private') : t('journal.local')
-      }</span></div>
-        ${banner}
-        <div class="empty">
-          <div class="empty-ic">${Icons.book}</div>
-          <h3>${query ? t('journal.noMatches') : t('journal.startsToday')}</h3>
-          <p>${
-            query ? t('journal.tryDifferentWords') : t('journal.noOneReads')
-          }</p>
-          ${
-            query
-              ? ''
-              : `<button class="btn btn-primary" data-action="new-entry">${t(
-                  'journal.writeFirst'
-                )}</button>`
-          }
-        </div>
-      `;
+      van.add(frag, this._empty(!!query));
+    } else {
+      van.add(
+        frag,
+        groupByDay(entries, (e) => e.created_at).map((g) => [
+          div({ class: 'day-label' }, dayLabel(g.items[0].created_at)),
+          g.items.map((entry) => this._entryCard(entry, transactions)),
+        ])
+      );
     }
+    return frag;
+  }
 
-    const transactions = store.get('transactions') || [];
-    const groups = groupByDay(entries, (e) => e.created_at);
-
-    return `
-      <div class="view-title">${t('journal.title')} <span class="priv-pill">${Icons.eyeOff} ${
-      authenticated ? t('journal.private') : t('journal.local')
-    }</span></div>
-      ${banner}
-      ${groups
-        .map(
-          (g) =>
-            `<div class="day-label">${dayLabel(g.items[0].created_at)}</div>` +
-            g.items.map((e) => this._entryCard(e, transactions)).join('')
-        )
-        .join('')}
-    `;
+  _title(authenticated) {
+    return div(
+      { class: 'view-title' },
+      t('journal.title'),
+      ' ',
+      span(
+        { class: 'priv-pill' },
+        span({ innerHTML: Icons.eyeOff }),
+        ` ${authenticated ? t('journal.private') : t('journal.local')}`
+      )
+    );
   }
 
   _guestBanner() {
-    return `
-      <div class="card">
-        <div class="card-head"><h3>${t('journal.localModeTitle')}</h3></div>
-        <p class="muted-p" style="text-align:left;padding:0 0 12px">
-          ${t('journal.localModeBody')}
-        </p>
-        <button class="btn btn-primary btn-block" data-action="connect">${t(
-          'journal.connectButton'
-        )}</button>
-      </div>
-    `;
+    return div(
+      { class: 'card' },
+      div({ class: 'card-head' }, h3(t('journal.localModeTitle'))),
+      p(
+        { class: 'muted-p', style: 'text-align:left;padding:0 0 12px' },
+        t('journal.localModeBody')
+      ),
+      button(
+        { class: 'btn btn-primary btn-block', 'data-action': 'connect' },
+        t('journal.connectButton')
+      )
+    );
+  }
+
+  _empty(hasQuery) {
+    return div(
+      { class: 'empty' },
+      div({ class: 'empty-ic', innerHTML: Icons.book }),
+      h3(hasQuery ? t('journal.noMatches') : t('journal.startsToday')),
+      p(hasQuery ? t('journal.tryDifferentWords') : t('journal.noOneReads')),
+      hasQuery
+        ? null
+        : button({ class: 'btn btn-primary', 'data-action': 'new-entry' }, t('journal.writeFirst'))
+    );
   }
 
   _tagsOf(entry) {
@@ -114,60 +124,66 @@ export class JournalPage extends Component {
     const money = moneyForEntry(entry, transactions);
     const long = (entry.text || '').length > 280;
     const tags = this._tagsOf(entry);
+    const time = new Date(toMs(entry.created_at)).toLocaleTimeString(locale(), {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
 
-    return `<article class="jentry rise" data-id="${entry.id}">
-      <div class="jentry-top">
-        ${
-          mood
-            ? `<span class="jmood"><span class="je">${mood.emoji}</span>${mood.label}</span>`
-            : '<span class="jmood"></span>'
-        }
-        <span class="jtime">${new Date(toMs(entry.created_at)).toLocaleTimeString(locale(), {
-          hour: 'numeric',
-          minute: '2-digit',
-        })}</span>
-      </div>
-      <p class="jtext">${escapeHtml(entry.text || '')}</p>
-      ${long ? `<button class="more-btn" data-action="expand">${t('common.showMore')}</button>` : ''}
-      ${
-        tags.length
-          ? `<div class="jtags">${tags
-              .map(
-                (t) =>
-                  `<button class="tag" data-action="jtag" data-tag="${escapeHtml(t)}">#${escapeHtml(
-                    t
-                  )}</button>`
-              )
-              .join('')}</div>`
-          : ''
-      }
-      ${
-        money.length
-          ? `<div class="jmoney">${money
-              .map((t) => {
-                const meta = categoryMeta(t.category);
-                const income = isIncome(t);
-                return `<span class="mchip ${income ? 'in' : 'out'}">${Icons.bolt}${
-                  income ? '+' : '−'
-                }${fmtSats(t.amount)}${fiatLabel(t.amount) ? ' · ' + fiatLabel(t.amount) : ''} · ${
-                  meta.label
-                }</span>`;
-              })
-              .join('')}</div>`
-          : ''
-      }
-      <div class="jacts">
-        <button class="act" data-action="entry-edit" data-id="${entry.id}">
-          <span class="ic">${Icons.edit}</span>${t('common.edit')}
-        </button>
-        <button class="act" data-action="attach-money" data-id="${entry.id}">
-          <span class="ic">${Icons.bolt}</span>${t('money.title')}
-        </button>
-        <button class="act danger" data-action="entry-del" data-id="${entry.id}">
-          <span class="ic">${Icons.trash}</span><span class="dl">${t('common.delete')}</span>
-        </button>
-      </div>
-    </article>`;
+    return article(
+      { class: 'jentry rise', 'data-id': entry.id },
+      div(
+        { class: 'jentry-top' },
+        mood
+          ? span({ class: 'jmood' }, span({ class: 'je' }, mood.emoji), mood.label)
+          : span({ class: 'jmood' }),
+        span({ class: 'jtime' }, time)
+      ),
+      p({ class: 'jtext' }, entry.text || ''),
+      long
+        ? button({ class: 'more-btn', 'data-action': 'expand' }, t('common.showMore'))
+        : null,
+      tags.length
+        ? div(
+            { class: 'jtags' },
+            tags.map((tag) =>
+              button({ class: 'tag', 'data-action': 'jtag', 'data-tag': tag }, `#${tag}`)
+            )
+          )
+        : null,
+      money.length
+        ? div(
+            { class: 'jmoney' },
+            money.map((m) => {
+              const meta = categoryMeta(m.category);
+              const income = isIncome(m);
+              const fiat = fiatLabel(m.amount);
+              return span(
+                { class: `mchip ${income ? 'in' : 'out'}` },
+                span({ innerHTML: Icons.bolt }),
+                `${income ? '+' : '−'}${fmtSats(m.amount)}${fiat ? ' · ' + fiat : ''} · ${meta.label}`
+              );
+            })
+          )
+        : null,
+      div(
+        { class: 'jacts' },
+        button(
+          { class: 'act', 'data-action': 'entry-edit', 'data-id': entry.id },
+          span({ class: 'ic', innerHTML: Icons.edit }),
+          t('common.edit')
+        ),
+        button(
+          { class: 'act', 'data-action': 'attach-money', 'data-id': entry.id },
+          span({ class: 'ic', innerHTML: Icons.bolt }),
+          t('money.title')
+        ),
+        button(
+          { class: 'act danger', 'data-action': 'entry-del', 'data-id': entry.id },
+          span({ class: 'ic', innerHTML: Icons.trash }),
+          span({ class: 'dl' }, t('common.delete'))
+        )
+      )
+    );
   }
 
   bindEvents() {
@@ -220,16 +236,18 @@ export class JournalPage extends Component {
   }
 
   _openEditEntry(entry) {
-    const content = document.createElement('div');
-    content.innerHTML = `
-      <textarea id="editEntryText" class="note-input" rows="6"
-        style="width:100%;min-height:150px;margin-top:8px"
-        placeholder="${t('journal.editPlaceholder')}">${escapeHtml(entry.text || '')}</textarea>
-    `;
+    const textareaEl = textarea({
+      id: 'editEntryText',
+      class: 'note-input',
+      rows: '6',
+      style: 'width:100%;min-height:150px;margin-top:8px',
+      placeholder: t('journal.editPlaceholder'),
+      value: entry.text || '',
+    });
 
     modal.open({
       title: t('journal.editTitle'),
-      content,
+      content: div(textareaEl),
       actions: [
         { label: t('common.cancel'), variant: 'btn-ghost', handler: () => {} },
         {
@@ -237,7 +255,7 @@ export class JournalPage extends Component {
           variant: 'btn-primary',
           closeOnClick: false,
           handler: async () => {
-            const text = content.querySelector('#editEntryText').value.trim();
+            const text = textareaEl.value.trim();
             if (!text) {
               toast(t('journal.writeSomething'), 'error');
               return false;
@@ -266,10 +284,6 @@ export class JournalPage extends Component {
     } catch (e) {
       toast(e.message || t('journal.couldNotAttach'), 'error');
     }
-  }
-
-  afterRender() {
-    hydrateIcons(this.container);
   }
 }
 

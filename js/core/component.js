@@ -7,7 +7,6 @@
 
 import { store } from './state.js';
 import { eventBus, Events } from './event-bus.js';
-import { escapeHtml } from '../utils/html.js';
 import van from '../vendor/van.js';
 
 export class Component {
@@ -271,15 +270,6 @@ export class Component {
     }
 
     // ==================== Utility Methods ====================
-
-    /**
-     * Safe HTML escaping
-     * @param {string} str - String to escape
-     * @returns {string} Escaped string
-     */
-    escape(str) {
-        return escapeHtml(str);
-    }
 
     /**
      * Format class names conditionally

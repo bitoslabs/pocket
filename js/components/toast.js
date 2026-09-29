@@ -156,11 +156,4 @@ class ToastManager {
 // Singleton instance
 export const toast = new ToastManager();
 
-// Convenience functions
-export const showToast = (options) => toast.show(options);
-export const toastSuccess = (message, title) => toast.success(message, title);
-export const toastError = (message, title) => toast.error(message, title);
-export const toastWarning = (message, title) => toast.warning(message, title);
-export const toastInfo = (message, title) => toast.info(message, title);
-
 export default toast;

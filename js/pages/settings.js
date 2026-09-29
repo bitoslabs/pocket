@@ -1,17 +1,23 @@
 /**
  * Profile Page - identity, stats, settings, data management
  *
+ * VanJS view: `template()` and the modal builders return DOM nodes built with
+ * `van.tags`, so text/attributes are escaped automatically and no
+ * `hydrateIcons` pass is needed. `_syncAppearance()` still patches the live
+ * accent/theme controls in place for a flash-free toggle.
+ *
  * @module pages/settings
  */
 
 import { Component } from '../core/component.js';
 import { store } from '../core/state.js';
+import { Events } from '../core/event-bus.js';
 import { config } from '../config.js';
 import { t, getLanguage, setLanguage, LANGUAGES } from '../core/i18n.js';
 import { authService } from '../services/auth-service.js';
-import { journalService } from '../services/journal-service.js';
 import { nostrService } from '../services/nostr-service.js';
 import { storageService } from '../services/storage-service.js';
+import { categoryService } from '../services/category-service.js';
 import { fetchProfile } from '../services/profile-service.js';
 import { CURRENCIES, priceService } from '../services/price-service.js';
 import { modal } from '../components/modal.js';
@@ -23,7 +29,7 @@ import {
   setAccent,
   setTheme,
 } from '../core/theme.js';
-import { Icons, hydrateIcons } from '../utils/icons.js';
+import { Icons } from '../utils/icons.js';
 import {
   categoryMeta,
   copyText,
@@ -33,6 +39,10 @@ import {
   toast,
   toMs,
 } from '../utils/ui.js';
+import van from '../vendor/van.js';
+
+const { a, b, button, code, div, h2, h3, img, input, label, option, p, select, span, textarea } =
+  van.tags;
 
 const NAME_KEY = 'zapjournal.name';
 const BIO_KEY = 'zapjournal.bio';
@@ -59,6 +69,11 @@ export class ProfilePage extends Component {
     this.watchStore('price', () => this.render());
     this.watchStore('sync', () => this.render());
     this.watchStore('profileMeta', () => this.render());
+    [
+      Events.CATEGORY_CREATED,
+      Events.CATEGORY_UPDATED,
+      Events.CATEGORY_DELETED,
+    ].forEach((event) => this.watchEvent(event, () => this.render()));
     this._loadProfile();
   }
 
@@ -102,15 +117,17 @@ export class ProfilePage extends Component {
     const entries = store.get('journal') || [];
     const txs = store.get('transactions') || [];
 
-    const tin = txs.filter(isIncome).reduce((a, t) => a + (Number(t.amount) || 0), 0);
-    const tout = txs.filter((t) => !isIncome(t)).reduce((a, t) => a + (Number(t.amount) || 0), 0);
+    const tin = txs.filter(isIncome).reduce((acc, tx) => acc + (Number(tx.amount) || 0), 0);
+    const tout = txs
+      .filter((tx) => !isIncome(tx))
+      .reduce((acc, tx) => acc + (Number(tx.amount) || 0), 0);
 
     const spentAll = {};
-    txs.filter((t) => !isIncome(t)).forEach((t) => {
-      const k = t.category || 'uncategorized';
-      spentAll[k] = (spentAll[k] || 0) + (Number(t.amount) || 0);
+    txs.filter((tx) => !isIncome(tx)).forEach((tx) => {
+      const k = tx.category || 'uncategorized';
+      spentAll[k] = (spentAll[k] || 0) + (Number(tx.amount) || 0);
     });
-    const topCat = Object.entries(spentAll).sort((a, b) => b[1] - a[1])[0];
+    const topCat = Object.entries(spentAll).sort((a2, b2) => b2[1] - a2[1])[0];
 
     const appLock = store.get('appLock');
     const sync = store.get('sync') || {};
@@ -127,343 +144,563 @@ export class ProfilePage extends Component {
       loading: false,
       error: '',
     };
-    const savedRelays = storageService.getLocal(config.storage.keys.RELAYS) || config.relays.default;
+    const savedRelays =
+      storageService.getLocal(config.storage.keys.RELAYS) || config.relays.default;
 
-    return `
-      <div class="view-title">${t('profile.title')}</div>
+    const frag = document.createDocumentFragment();
+    van.add(
+      frag,
+      div({ class: 'view-title' }, t('profile.title')),
+      this._heroCard({ name, npub, picture, nip05, lud16, bio, entries, streak, tin, tout }),
+      topCat ? this._topCatCard(topCat) : null,
+      this._appearanceCard(themeMode, accent),
+      this._languageCard(),
+      this._categoriesCard(),
+      this._moneyRateCard(price),
+      this._syncCard(sync, relays, authenticated),
+      this._actionsCard({ authenticated, npub, appLock, hasLocalKey }),
+      this._relaysCard(savedRelays, relays),
+      div(
+        { class: 'card', style: 'padding:6px 16px' },
+        a(
+          { class: 'set-row', href: '#about' },
+          this._ic('info'),
+          span(b(t('profile.aboutApp')), span(t('profile.aboutSub'))),
+          span({ class: 'ic', style: 'margin-left:auto', innerHTML: Icons.chevR })
+        )
+      ),
+      div(
+        { class: 'card', style: 'padding:6px 16px' },
+        button(
+          { class: 'set-row danger', 'data-action': 'reset' },
+          this._ic('trash'),
+          span(b(t('profile.reset')), span(t('profile.resetSub')))
+        )
+      ),
+      p(
+        { class: 'muted-p', style: 'margin-bottom:24px' },
+        `${t('common.byBitOS')} · v${config.app.version} · ${t('profile.footer')}`
+      )
+    );
+    return frag;
+  }
 
-      <div class="card" style="padding-bottom:14px">
-        <div class="banner"></div>
-        <div class="prof-row">
-          <div class="avatar" style="background:linear-gradient(135deg,var(--accent),var(--accent-deep))">
-            <span class="avatar-initial">${(name[0] || '?').toUpperCase()}</span>
-            ${picture ? `<img src="${this.escape(picture)}" alt="" referrerpolicy="no-referrer" />` : ''}
-          </div>
-          <button type="button" class="prof-edit" data-action="edit-profile"
-            title="${t('profile.editProfile')}" aria-label="${t('profile.editProfile')}">
-            <span class="ic">${Icons.edit}</span>${t('profile.editProfile')}
-          </button>
-        </div>
-        <h2 class="prof-name">${this.escape(name)}</h2>
-        ${
-          npub
-            ? `<button class="npub-full" data-action="copy-npub">
-                 <span class="ic">${Icons.copy}</span>${shortNpub(npub)}</button>`
-            : ''
-        }
-        ${
-          nip05 || lud16
-            ? `<div class="prof-meta">
-                 ${
-                   nip05
-                     ? `<span class="prof-chip nip05">${Icons.check}${this.escape(nip05)}</span>`
-                     : ''
-                 }
-                 ${
-                   lud16
-                     ? `<button type="button" class="prof-chip" data-action="copy-lud16"
-                          title="${t('profile.lightningAddress')}">${Icons.zap}${this.escape(
-                          shortLn(lud16)
-                        )}</button>`
-                     : ''
-                 }
-               </div>`
-            : ''
-        }
-        <p class="bio">${this.escape(bio)}</p>
-        <div class="prof-stats">
-          <div class="pstat"><b>${entries.length}</b><span>${t('profile.entries')}</span></div>
-          <div class="pstat"><b class="streak">${Icons.flame}${streak}</b><span>${t(
-            'profile.dayStreak'
-          )}</span></div>
-          <div class="pstat"><b style="color:var(--in)">${fmtSats(tin)}</b><span>${t(
-            'profile.allTimeIn'
-          )}</span></div>
-          <div class="pstat"><b style="color:var(--out)">${fmtSats(tout)}</b><span>${t(
-            'profile.allTimeOut'
-          )}</span></div>
-        </div>
-      </div>
+  _ic(name) {
+    return span({ class: 'ic', innerHTML: Icons[name] });
+  }
 
-      ${
-        topCat
-          ? `<div class="card"><p class="muted-p" style="padding:0">
-               ${t('profile.biggestCategory')} <b style="color:${
-                 categoryMeta(topCat[0]).color
-               }">${categoryMeta(topCat[0]).label}</b> · ${fmtSats(topCat[1])} ${t(
-                 'common.sats'
-               )}</p></div>`
-          : ''
-      }
+  _heroCard({ name, npub, picture, nip05, lud16, bio, entries, streak, tin, tout }) {
+    return div(
+      { class: 'card', style: 'padding-bottom:14px' },
+      div({ class: 'banner' }),
+      div(
+        { class: 'prof-row' },
+        div(
+          {
+            class: 'avatar',
+            style: 'background:linear-gradient(135deg,var(--accent),var(--accent-deep))',
+          },
+          span({ class: 'avatar-initial' }, (name[0] || '?').toUpperCase()),
+          picture
+            ? img({
+                src: picture,
+                alt: '',
+                referrerpolicy: 'no-referrer',
+                onerror: (e) => e.target.remove(),
+              })
+            : null
+        ),
+        button(
+          {
+            type: 'button',
+            class: 'prof-edit',
+            'data-action': 'edit-profile',
+            title: t('profile.editProfile'),
+            'aria-label': t('profile.editProfile'),
+          },
+          this._ic('edit'),
+          t('profile.editProfile')
+        )
+      ),
+      h2({ class: 'prof-name' }, name),
+      npub
+        ? button(
+            { class: 'npub-full', 'data-action': 'copy-npub' },
+            this._ic('copy'),
+            shortNpub(npub)
+          )
+        : null,
+      nip05 || lud16
+        ? div(
+            { class: 'prof-meta' },
+            nip05
+              ? span({ class: 'prof-chip nip05' }, span({ innerHTML: Icons.check }), nip05)
+              : null,
+            lud16
+              ? button(
+                  {
+                    type: 'button',
+                    class: 'prof-chip',
+                    'data-action': 'copy-lud16',
+                    title: t('profile.lightningAddress'),
+                  },
+                  span({ innerHTML: Icons.zap }),
+                  shortLn(lud16)
+                )
+              : null
+          )
+        : null,
+      p({ class: 'bio' }, bio),
+      div(
+        { class: 'prof-stats' },
+        div({ class: 'pstat' }, b(`${entries.length}`), span(t('profile.entries'))),
+        div(
+          { class: 'pstat' },
+          b({ class: 'streak' }, span({ innerHTML: Icons.flame }), `${streak}`),
+          span(t('profile.dayStreak'))
+        ),
+        div({ class: 'pstat' }, b({ style: 'color:var(--in)' }, fmtSats(tin)), span(t('profile.allTimeIn'))),
+        div({ class: 'pstat' }, b({ style: 'color:var(--out)' }, fmtSats(tout)), span(t('profile.allTimeOut')))
+      )
+    );
+  }
 
-      <div class="card">
-        <div class="card-head"><h3>${t('profile.appearance')}</h3></div>
-        <div class="seg" style="margin-bottom:14px">
-          <button type="button" data-action="set-theme" data-theme="dark"
-            class="${themeMode === 'dark' ? 'on' : ''}">
-            <span class="ic">${Icons.Moon}</span>${t('profile.dark')}
-          </button>
-          <button type="button" data-action="set-theme" data-theme="light"
-            class="${themeMode === 'light' ? 'on' : ''}">
-            <span class="ic">${Icons.Sun}</span>${t('profile.light')}
-          </button>
-        </div>
-        <div class="bud-top" style="margin-bottom:6px">
-          <span>${t('profile.accentColor')}</span>
-          <b style="color:${accent}">${accent}</b>
-        </div>
-        <div class="swatches">
-          ${ACCENT_PRESETS.map(
-            (a) =>
-              `<button type="button" class="swatch ${accent === a.hex ? 'on' : ''}"
-                 style="background:${a.hex}" data-action="set-accent" data-accent="${a.hex}"
-                 title="${a.name}" aria-label="${a.name}"></button>`
-          ).join('')}
-        </div>
-        <div class="color-field">
-          <input type="color" id="accentPicker" value="${accent.toLowerCase()}" aria-label="${t(
-            'profile.customAccent'
-          )}" />
-          <code>${t('profile.custom')}</code>
-        </div>
-      </div>
+  _topCatCard(topCat) {
+    const meta = categoryMeta(topCat[0]);
+    return div(
+      { class: 'card' },
+      p(
+        { class: 'muted-p', style: 'padding:0' },
+        t('profile.biggestCategory'),
+        ' ',
+        b({ style: `color:${meta.color}` }, meta.label),
+        ` · ${fmtSats(topCat[1])} ${t('common.sats')}`
+      )
+    );
+  }
 
-      <div class="card">
-        <div class="card-head"><h3>${t('profile.language')}</h3></div>
-        <p class="muted-p" style="text-align:left;padding:0 0 10px">${t(
-          'profile.languageSub'
-        )}</p>
-        <div class="seg seg-3">
-          ${LANGUAGES.map(
-            (l) =>
-              `<button type="button" data-action="set-language" data-lang="${l.code}"
-                 aria-pressed="${getLanguage() === l.code}"
-                 class="${getLanguage() === l.code ? 'on' : ''}">${l.label}</button>`
-          ).join('')}
-        </div>
-      </div>
+  _appearanceCard(themeMode, accent) {
+    return div(
+      { class: 'card' },
+      div({ class: 'card-head' }, h3(t('profile.appearance'))),
+      div(
+        { class: 'seg', style: 'margin-bottom:14px' },
+        button(
+          {
+            type: 'button',
+            'data-action': 'set-theme',
+            'data-theme': 'dark',
+            class: themeMode === 'dark' ? 'on' : '',
+          },
+          this._ic('Moon'),
+          t('profile.dark')
+        ),
+        button(
+          {
+            type: 'button',
+            'data-action': 'set-theme',
+            'data-theme': 'light',
+            class: themeMode === 'light' ? 'on' : '',
+          },
+          this._ic('Sun'),
+          t('profile.light')
+        )
+      ),
+      div(
+        { class: 'bud-top', style: 'margin-bottom:6px' },
+        span(t('profile.accentColor')),
+        b({ style: `color:${accent}` }, accent)
+      ),
+      div(
+        { class: 'swatches' },
+        ACCENT_PRESETS.map((preset) =>
+          button({
+            type: 'button',
+            class: `swatch ${accent === preset.hex ? 'on' : ''}`,
+            style: `background:${preset.hex}`,
+            'data-action': 'set-accent',
+            'data-accent': preset.hex,
+            title: preset.name,
+            'aria-label': preset.name,
+          })
+        )
+      ),
+      div(
+        { class: 'color-field' },
+        input({
+          type: 'color',
+          id: 'accentPicker',
+          value: accent.toLowerCase(),
+          'aria-label': t('profile.customAccent'),
+        }),
+        code(t('profile.custom'))
+      )
+    );
+  }
 
-      <div class="card">
-        <div class="card-head"><h3>${t('profile.moneyRate')}</h3>
-          <span class="badge ${price.error ? 'badge-error' : 'badge-neutral'}">${
-            price.loading
-              ? t('profile.updating')
-              : price.rateSource === 'manual'
-              ? t('profile.manual')
-              : price.ageLabel || t('profile.auto')
-          }</span>
-        </div>
+  _languageCard() {
+    return div(
+      { class: 'card' },
+      div({ class: 'card-head' }, h3(t('profile.language'))),
+      p({ class: 'muted-p', style: 'text-align:left;padding:0 0 10px' }, t('profile.languageSub')),
+      div(
+        { class: 'seg seg-3' },
+        LANGUAGES.map((l) => {
+          const active = getLanguage() === l.code;
+          return button(
+            {
+              type: 'button',
+              'data-action': 'set-language',
+              'data-lang': l.code,
+              'aria-pressed': String(active),
+              class: active ? 'on' : '',
+            },
+            l.label
+          );
+        })
+      )
+    );
+  }
 
-        <label class="fld" style="margin-bottom:12px">${t('profile.currency')}
-          <select id="currencySelect" class="input">
-            ${CURRENCIES.map(
-              (c) => `<option value="${c}" ${c === price.currency ? 'selected' : ''}>${c}</option>`
-            ).join('')}
-          </select>
-        </label>
-
-        <button class="set-row" data-action="toggle-fiat" aria-pressed="${price.showFiat}">
-          <span class="ic">${Icons.wallet}</span>
-          <span><b>${t('profile.showFiat')}</b><span>${
+  _moneyRateCard(price) {
+    return div(
+      { class: 'card' },
+      div(
+        { class: 'card-head' },
+        h3(t('profile.moneyRate')),
+        span(
+          { class: `badge ${price.error ? 'badge-error' : 'badge-neutral'}` },
+          price.loading
+            ? t('profile.updating')
+            : price.rateSource === 'manual'
+            ? t('profile.manual')
+            : price.ageLabel || t('profile.auto')
+        )
+      ),
+      label(
+        { class: 'fld', style: 'margin-bottom:12px' },
+        t('profile.currency'),
+        select(
+          { id: 'currencySelect', class: 'input' },
+          CURRENCIES.map((c) =>
+            option({ value: c, selected: c === price.currency }, c)
+          )
+        )
+      ),
+      button(
+        { class: 'set-row', 'data-action': 'toggle-fiat', 'aria-pressed': String(price.showFiat) },
+        this._ic('wallet'),
+        span(
+          b(t('profile.showFiat')),
+          span(
             price.showFiat
               ? t('profile.comparingSats', { currency: price.currency })
               : t('profile.satsOnly')
-          }</span></span>
-          <span class="switch ${price.showFiat ? 'on' : ''}"></span>
-        </button>
+          )
+        ),
+        span({ class: `switch ${price.showFiat ? 'on' : ''}` })
+      ),
+      div({ class: 'bud-top', style: 'margin:12px 0 6px' }, span(t('profile.rateSource'))),
+      div(
+        { class: 'seg' },
+        button(
+          {
+            type: 'button',
+            'data-action': 'rate-source',
+            'data-src': 'auto',
+            class: price.rateSource === 'auto' ? 'on' : '',
+          },
+          this._ic('spark'),
+          t('profile.auto')
+        ),
+        button(
+          {
+            type: 'button',
+            'data-action': 'rate-source',
+            'data-src': 'manual',
+            class: price.rateSource === 'manual' ? 'on' : '',
+          },
+          this._ic('edit'),
+          t('profile.manual')
+        )
+      ),
+      price.rateSource === 'manual'
+        ? label(
+            { class: 'fld', style: 'margin-top:12px' },
+            t('profile.manualRate', { currency: price.currency }),
+            input({
+              id: 'manualRate',
+              type: 'number',
+              inputmode: 'decimal',
+              value: price.manualRate || '',
+              placeholder: '0',
+            })
+          )
+        : null,
+      div(
+        { class: 'set-row', style: 'cursor:default' },
+        this._ic('trending'),
+        span(
+          { style: 'flex:1;min-width:0' },
+          b(
+            `${t('profile.btcEquals')} ${
+              price.rate ? priceService.formatAmount(price.rate, price.currency) : '—'
+            }`
+          ),
+          span(
+            price.error
+              ? price.error
+              : price.loading
+              ? t('profile.updating')
+              : price.ageLabel
+              ? t('profile.updated', { age: price.ageLabel })
+              : t('profile.notFetched')
+          )
+        ),
+        button({ class: 'btn btn-ghost btn-sm', 'data-action': 'refresh-rate' }, t('common.refresh'))
+      )
+    );
+  }
 
-        <div class="bud-top" style="margin:12px 0 6px"><span>${t(
-          'profile.rateSource'
-        )}</span></div>
-        <div class="seg">
-          <button type="button" data-action="rate-source" data-src="auto"
-            class="${price.rateSource === 'auto' ? 'on' : ''}">
-            <span class="ic">${Icons.spark}</span>${t('profile.auto')}
-          </button>
-          <button type="button" data-action="rate-source" data-src="manual"
-            class="${price.rateSource === 'manual' ? 'on' : ''}">
-            <span class="ic">${Icons.edit}</span>${t('profile.manual')}
-          </button>
-        </div>
+  _syncCard(sync, relays, authenticated) {
+    const pending = sync.pending || 0;
+    let label = t('profile.allSynced');
+    let badge = 'badge-neutral';
+    let sub = relays.length
+      ? t(relays.length === 1 ? 'profile.relayCount' : 'profile.relayCountPlural', {
+          n: relays.length,
+        })
+      : t('profile.noRelays');
+    if (!authenticated) {
+      label = t('profile.localOnly');
+      badge = 'badge-neutral';
+      sub = t('profile.logInToBackup');
+    } else if (!sync.online) {
+      label = t('profile.offline');
+      badge = 'badge-error';
+      sub =
+        pending > 0
+          ? t('profile.changesWaiting', { n: pending })
+          : t('profile.changesSyncOnline');
+    } else if (sync.status === 'syncing') {
+      label = t('profile.syncing');
+      badge = 'badge-neutral';
+    } else if (sync.status === 'error') {
+      label = t('profile.syncError');
+      badge = 'badge-error';
+      sub = sync.error || t('profile.tapSyncRetry');
+    } else if (pending > 0) {
+      label = t('profile.pendingCount', { n: pending });
+      badge = 'badge-neutral';
+      sub = t('profile.waitingToPublish');
+    } else if (sync.lastSyncedAt) {
+      sub = t('profile.lastSynced', {
+        time: new Date(sync.lastSyncedAt).toLocaleTimeString(),
+      });
+    }
 
-        ${
-          price.rateSource === 'manual'
-            ? `<label class="fld" style="margin-top:12px">${t('profile.manualRate', {
-                currency: price.currency,
-              })}
-                 <input id="manualRate" type="number" inputmode="decimal"
-                   value="${price.manualRate || ''}" placeholder="0" />
-               </label>`
-            : ''
-        }
+    return div(
+      { class: 'card' },
+      div(
+        { class: 'card-head' },
+        h3(t('profile.sync')),
+        span({ class: `badge ${badge}` }, label)
+      ),
+      div(
+        { class: 'set-row', style: 'cursor:default' },
+        this._ic('bolt'),
+        span({ style: 'flex:1;min-width:0' }, b(label), span(sub)),
+        authenticated
+          ? button(
+              { class: 'btn btn-ghost btn-sm', 'data-action': 'retry-sync', disabled: !sync.online },
+              t('profile.syncNow')
+            )
+          : null
+      )
+    );
+  }
 
-        <div class="set-row" style="cursor:default">
-          <span class="ic">${Icons.trending}</span>
-          <span style="flex:1;min-width:0"><b>${t('profile.btcEquals')} ${
-            price.rate ? priceService.formatAmount(price.rate, price.currency) : '—'
-          }</b>
-            <span>${
-              price.error
-                ? price.error
-                : price.loading
-                ? t('profile.updating')
-                : price.ageLabel
-                ? t('profile.updated', { age: price.ageLabel })
-                : t('profile.notFetched')
-            }</span></span>
-          <button class="btn btn-ghost btn-sm" data-action="refresh-rate">${t(
-            'common.refresh'
-          )}</button>
-        </div>
-      </div>
+  _actionsCard({ authenticated, npub, appLock, hasLocalKey }) {
+    return div(
+      { class: 'card', style: 'padding:6px 16px' },
+      authenticated
+        ? button(
+            { class: 'set-row', 'data-action': 'logout' },
+            this._ic('lock'),
+            span(b(t('profile.disconnect')), span(shortNpub(npub)))
+          )
+        : button(
+            { class: 'set-row', 'data-action': 'connect' },
+            this._ic('plug'),
+            span(b(t('profile.connect')), span(t('profile.connectSub')))
+          ),
+      button(
+        { class: 'set-row', 'data-action': 'edit-profile' },
+        this._ic('edit'),
+        span(b(t('profile.editProfile')), span(t('profile.nameBio')))
+      ),
+      button(
+        { class: 'set-row', 'data-action': 'toggle-lock', 'aria-pressed': String(appLock) },
+        this._ic('lock'),
+        span(b(t('profile.appLock')), span(appLock ? t('profile.pinRequired') : t('profile.offNoPin'))),
+        span({ class: `switch ${appLock ? 'on' : ''}`, 'aria-hidden': 'true' })
+      ),
+      appLock
+        ? button(
+            { class: 'set-row', 'data-action': 'change-pin' },
+            this._ic('lock'),
+            span(b(t('profile.changePin')), span(t('profile.reLock')))
+          )
+        : null,
+      button(
+        { class: 'set-row', 'data-action': 'export' },
+        this._ic('download'),
+        span(b(t('profile.export')), span(t('profile.exportSub')))
+      ),
+      authenticated
+        ? button(
+            { class: 'set-row', 'data-action': 'backup-key' },
+            this._ic('key'),
+            span(
+              b(t('profile.backupKey')),
+              span(hasLocalKey ? t('profile.backupKeySub') : t('profile.keyManagedByExt'))
+            )
+          )
+        : null
+    );
+  }
 
-      ${
-        (() => {
-          const pending = sync.pending || 0;
-          let label = t('profile.allSynced');
-          let badge = 'badge-neutral';
-          let sub = relays.length
-            ? t(relays.length === 1 ? 'profile.relayCount' : 'profile.relayCountPlural', {
-                n: relays.length,
-              })
-            : t('profile.noRelays');
-          if (!authenticated) {
-            label = t('profile.localOnly');
-            badge = 'badge-neutral';
-            sub = t('profile.logInToBackup');
-          } else if (!sync.online) {
-            label = t('profile.offline');
-            badge = 'badge-error';
-            sub =
-              pending > 0
-                ? t('profile.changesWaiting', { n: pending })
-                : t('profile.changesSyncOnline');
-          } else if (sync.status === 'syncing') {
-            label = t('profile.syncing');
-            badge = 'badge-neutral';
-          } else if (sync.status === 'error') {
-            label = t('profile.syncError');
-            badge = 'badge-error';
-            sub = sync.error || t('profile.tapSyncRetry');
-          } else if (pending > 0) {
-            label = t('profile.pendingCount', { n: pending });
-            badge = 'badge-neutral';
-            sub = t('profile.waitingToPublish');
-          } else if (sync.lastSyncedAt) {
-            sub = t('profile.lastSynced', {
-              time: new Date(sync.lastSyncedAt).toLocaleTimeString(),
-            });
-          }
-          return `<div class="card">
-            <div class="card-head"><h3>${t('profile.sync')}</h3><span class="badge ${badge}">${label}</span></div>
-            <div class="set-row" style="cursor:default">
-              <span class="ic">${Icons.bolt}</span>
-              <span style="flex:1;min-width:0"><b>${label}</b><span>${sub}</span></span>
-              ${
-                authenticated
-                  ? `<button class="btn btn-ghost btn-sm" data-action="retry-sync" ${
-                      sync.online ? '' : 'disabled'
-                    }>${t('profile.syncNow')}</button>`
-                  : ''
-              }
-            </div>
-          </div>`;
-        })()
-      }
+  _relaysCard(savedRelays, relays) {
+    return div(
+      { class: 'card' },
+      div(
+        { class: 'card-head' },
+        h3(t('profile.relays')),
+        span(
+          { class: `badge ${relays.length ? 'badge-success' : 'badge-neutral'}` },
+          t('profile.connectedCount', { n: relays.length })
+        )
+      ),
+      savedRelays.map((r) => {
+        const conn = relays.includes(r);
+        const isDefault = config.relays.default.includes(r);
+        return div(
+          { class: 'set-row', style: 'cursor:default' },
+          span({ class: `status-dot ${conn ? 'connected' : ''}` }),
+          span(
+            { style: 'flex:1' },
+            b({ class: 'font-mono', style: 'font-size:12px' }, r),
+            span(
+              conn ? t('profile.connected') : t('profile.offlineState'),
+              isDefault ? ` · ${t('profile.default')}` : ''
+            )
+          ),
+          isDefault
+            ? null
+            : button(
+                { class: 'btn btn-ghost btn-sm', 'data-action': 'remove-relay', 'data-relay': r },
+                t('common.remove')
+              )
+        );
+      }),
+      div(
+        { class: 'join', style: 'margin-top:12px' },
+        input({ type: 'text', class: 'input relay-input', placeholder: t('profile.relayPlaceholder') }),
+        button(
+          { class: 'btn btn-primary', 'data-action': 'add-relay', style: 'flex:0 0 auto' },
+          t('common.add')
+        )
+      )
+    );
+  }
 
-      <div class="card" style="padding:6px 16px">
-        ${
-          authenticated
-            ? `<button class="set-row" data-action="logout"><span class="ic">${Icons.lock}</span>
-                 <span><b>${t('profile.disconnect')}</b><span>${shortNpub(npub)}</span></span></button>`
-            : `<button class="set-row" data-action="connect"><span class="ic">${Icons.plug}</span>
-                 <span><b>${t('profile.connect')}</b><span>${t(
-                   'profile.connectSub'
-                 )}</span></span></button>`
-        }
-        <button class="set-row" data-action="edit-profile"><span class="ic">${Icons.edit}</span>
-          <span><b>${t('profile.editProfile')}</b><span>${t('profile.nameBio')}</span></span></button>
-        <button class="set-row" data-action="toggle-lock" aria-pressed="${appLock}">
-          <span class="ic">${Icons.lock}</span>
-          <span><b>${t('profile.appLock')}</b><span>${
-            appLock ? t('profile.pinRequired') : t('profile.offNoPin')
-          }</span></span>
-          <span class="switch ${appLock ? 'on' : ''}" aria-hidden="true"></span>
-        </button>
-        ${
-          appLock
-            ? `<button class="set-row" data-action="change-pin"><span class="ic">${Icons.lock}</span>
-                 <span><b>${t('profile.changePin')}</b><span>${t(
-                   'profile.reLock'
-                 )}</span></span></button>`
-            : ''
-        }
-        <button class="set-row" data-action="export"><span class="ic">${Icons.download}</span>
-          <span><b>${t('profile.export')}</b><span>${t(
-            'profile.exportSub'
-          )}</span></span></button>
-        ${
-          authenticated
-            ? `<button class="set-row" data-action="backup-key"><span class="ic">${Icons.key}</span>
-                 <span><b>${t('profile.backupKey')}</b><span>${
-                hasLocalKey ? t('profile.backupKeySub') : t('profile.keyManagedByExt')
-              }</span></span></button>`
-            : ''
-        }
-      </div>
+  _categoriesCard() {
+    const cats = categoryService.getCategories();
+    return div(
+      { class: 'card' },
+      div(
+        { class: 'card-head' },
+        h3(t('profile.categories')),
+        button(
+          { class: 'btn btn-ghost btn-sm', 'data-action': 'add-category' },
+          t('profile.addCategory')
+        )
+      ),
+      cats.map((cat) => this._categoryRow(cat))
+    );
+  }
 
-      <div class="card">
-        <div class="card-head"><h3>${t('profile.relays')}</h3>
-          <span class="badge ${relays.length ? 'badge-success' : 'badge-neutral'}">${t(
-            'profile.connectedCount',
-            { n: relays.length }
-          )}</span>
-        </div>
-        ${savedRelays
-          .map((r) => {
-            const conn = relays.includes(r);
-            const isDefault = config.relays.default.includes(r);
-            return `<div class="set-row" style="cursor:default">
-              <span class="status-dot ${conn ? 'connected' : ''}"></span>
-              <span style="flex:1"><b class="font-mono" style="font-size:12px">${this.escape(r)}</b>
-                <span>${conn ? t('profile.connected') : t('profile.offlineState')}${
-              isDefault ? ' · ' + t('profile.default') : ''
-            }</span></span>
-              ${
-                !isDefault
-                  ? `<button class="btn btn-ghost btn-sm" data-action="remove-relay" data-relay="${this.escape(
-                      r
-                    )}">${t('common.remove')}</button>`
-                  : ''
-              }
-            </div>`;
-          })
-          .join('')}
-        <div class="join" style="margin-top:12px">
-          <input type="text" class="input relay-input" placeholder="${t(
-            'profile.relayPlaceholder'
-          )}" />
-          <button class="btn btn-primary" data-action="add-relay" style="flex:0 0 auto">${t(
-            'common.add'
-          )}</button>
-        </div>
-      </div>
+  _categoryRow(cat) {
+    const typeLabel =
+      cat.type === 'income'
+        ? t('tx.income')
+        : cat.type === 'both'
+        ? t('profile.categoryBoth')
+        : t('tx.expense');
+    return div(
+      { class: 'set-row', style: 'cursor:default' },
+      span({ style: 'font-size:18px;line-height:1' }, cat.icon),
+      span({ style: 'flex:1' }, b(cat.name), span(typeLabel)),
+      cat.isCustom
+        ? button(
+            { class: 'btn btn-ghost btn-sm', 'data-action': 'delete-category', 'data-id': cat.id },
+            t('common.delete')
+          )
+        : null
+    );
+  }
 
-      <div class="card" style="padding:6px 16px">
-        <a class="set-row" href="#about"><span class="ic">${Icons.info}</span>
-          <span><b>${t('profile.aboutApp')}</b><span>${t('profile.aboutSub')}</span></span>
-          <span class="ic" style="margin-left:auto">${Icons.chevR}</span></a>
-      </div>
+  _openAddCategory() {
+    const nameEl = input({ type: 'text', id: 'catName', maxlength: '40' });
+    const typeEl = select(
+      { id: 'catType', class: 'input' },
+      option({ value: 'expense' }, t('tx.expense')),
+      option({ value: 'income' }, t('tx.income')),
+      option({ value: 'both' }, t('profile.categoryBoth'))
+    );
+    const iconEl = input({ type: 'text', id: 'catIcon', maxlength: '2', placeholder: '📌' });
+    const colorEl = input({ type: 'color', id: 'catColor', value: '#8C8C8C' });
 
-      <div class="card" style="padding:6px 16px">
-        <button class="set-row danger" data-action="reset"><span class="ic">${Icons.trash}</span>
-          <span><b>${t('profile.reset')}</b><span>${t('profile.resetSub')}</span></span></button>
-      </div>
+    const content = div(
+      label({ class: 'fld' }, t('profile.categoryName'), nameEl),
+      label({ class: 'fld' }, t('profile.categoryType'), typeEl),
+      label({ class: 'fld' }, t('profile.categoryIcon'), iconEl),
+      label({ class: 'fld' }, t('profile.categoryColor'), colorEl)
+    );
 
-      <p class="muted-p" style="margin-bottom:24px">
-        ZapJournal v${config.app.version} · ${t('profile.footer')}
-      </p>
-    `;
+    modal.open({
+      title: t('profile.newCategory'),
+      content,
+      actions: [
+        { label: t('common.cancel'), variant: 'btn-ghost', handler: () => {} },
+        {
+          label: t('common.save'),
+          variant: 'btn-primary',
+          closeOnClick: false,
+          handler: async () => {
+            const name = nameEl.value.trim();
+            if (!name) {
+              toast(t('profile.categoryName'), 'error');
+              return false;
+            }
+            try {
+              await categoryService.createCategory({
+                name,
+                type: typeEl.value,
+                icon: iconEl.value || '📌',
+                color: colorEl.value,
+              });
+              modal.close();
+              toast(t('profile.categoryCreated'));
+              this.render();
+            } catch (err) {
+              toast(err.message || t('profile.categoryCreated'), 'error');
+            }
+            return false;
+          },
+        },
+      ],
+    });
   }
 
   _streak(entries) {
@@ -543,6 +780,25 @@ export class ProfilePage extends Component {
         }
       } else if (action === 'change-pin') {
         lock.show('setup', { cancelable: true });
+      } else if (action === 'add-category') {
+        this._openAddCategory();
+      } else if (action === 'delete-category') {
+        const cat = categoryService.getCategory(el.dataset.id);
+        if (!cat) return;
+        const ok = await modal.confirm({
+          title: t('profile.deleteCategoryTitle'),
+          message: t('profile.deleteCategoryMessage'),
+          confirmText: t('common.delete'),
+          danger: true,
+        });
+        if (!ok) return;
+        try {
+          await categoryService.deleteCategory(cat.id);
+          toast(t('profile.categoryDeleted'));
+          this.render();
+        } catch (err) {
+          toast(err.message || t('profile.categoryDeleted'), 'error');
+        }
       } else if (action === 'export') {
         this._exportData();
       } else if (action === 'add-relay') {
@@ -618,27 +874,38 @@ export class ProfilePage extends Component {
 
   _openEditProfile() {
     const { name, bio, picture, nip05, lud16 } = this._profile();
-    const content = document.createElement('div');
-    content.innerHTML = `
-      <label class="fld">${t('profile.displayName')}
-        <input type="text" id="peName" maxlength="40" value="${this.escape(name)}" />
-      </label>
-      <label class="fld">${t('profile.bio')}
-        <textarea id="peBio" rows="3" maxlength="160">${this.escape(bio)}</textarea>
-      </label>
-      <label class="fld">${t('profile.picture')}
-        <input type="url" id="pePicture" inputmode="url"
-          placeholder="https://…" value="${this.escape(picture)}" />
-      </label>
-      <label class="fld">${t('profile.nip05')}
-        <input type="text" id="peNip05" placeholder="you@domain.com"
-          value="${this.escape(nip05)}" />
-      </label>
-      <label class="fld">${t('profile.lightningAddress')}
-        <input type="text" id="peLud16" placeholder="you@getalby.com"
-          value="${this.escape(lud16)}" />
-      </label>
-      <p class="hint" style="max-width:none">${t('profile.editProfileHint')}</p>`;
+
+    const nameEl = input({ type: 'text', id: 'peName', maxlength: '40', value: name });
+    const bioEl = textarea({ id: 'peBio', rows: '3', maxlength: '160' }, bio);
+    const pictureEl = input({
+      type: 'url',
+      id: 'pePicture',
+      inputmode: 'url',
+      placeholder: 'https://…',
+      value: picture,
+    });
+    const nip05El = input({
+      type: 'text',
+      id: 'peNip05',
+      placeholder: 'you@domain.com',
+      value: nip05,
+    });
+    const lud16El = input({
+      type: 'text',
+      id: 'peLud16',
+      placeholder: 'you@getalby.com',
+      value: lud16,
+    });
+
+    const content = div(
+      label({ class: 'fld' }, t('profile.displayName'), nameEl),
+      label({ class: 'fld' }, t('profile.bio'), bioEl),
+      label({ class: 'fld' }, t('profile.picture'), pictureEl),
+      label({ class: 'fld' }, t('profile.nip05'), nip05El),
+      label({ class: 'fld' }, t('profile.lightningAddress'), lud16El),
+      p({ class: 'hint', style: 'max-width:none' }, t('profile.editProfileHint'))
+    );
+
     modal.open({
       title: t('profile.editProfile'),
       content,
@@ -648,11 +915,11 @@ export class ProfilePage extends Component {
           variant: 'btn-primary',
           handler: () => {
             const meta = {
-              name: content.querySelector('#peName').value.trim() || name,
-              about: content.querySelector('#peBio').value.trim(),
-              picture: content.querySelector('#pePicture').value.trim(),
-              nip05: content.querySelector('#peNip05').value.trim(),
-              lud16: content.querySelector('#peLud16').value.trim(),
+              name: nameEl.value.trim() || name,
+              about: bioEl.value.trim(),
+              picture: pictureEl.value.trim(),
+              nip05: nip05El.value.trim(),
+              lud16: lud16El.value.trim(),
             };
             this._saveProfile(meta);
           },
@@ -725,7 +992,7 @@ export class ProfilePage extends Component {
     if (!privkey) {
       modal.open({
         title: t('profile.backupKey'),
-        content: `<p style="margin:0;line-height:1.6">${t('profile.keyManagedByExtBody')}</p>`,
+        content: p({ style: 'margin:0;line-height:1.6' }, t('profile.keyManagedByExtBody')),
         actions: [{ label: t('common.ok'), variant: 'btn-primary', handler: () => true }],
       });
       return;
@@ -739,34 +1006,50 @@ export class ProfilePage extends Component {
     }
     nsec = nsec || privkey;
 
-    const content = document.createElement('div');
-    content.innerHTML = `
-      <div class="alert alert-warning" style="margin-bottom:14px">
-        <b style="display:block;margin-bottom:4px">${t('profile.secretWarningTitle')}</b>
-        <span style="font-size:12.5px;line-height:1.5">${t('profile.secretWarningBody')}</span>
-      </div>
-      <label class="fld">${t('profile.secretKey')}
-        <div class="key-field">
-          <input id="peNsec" type="password" readonly value="${this.escape(nsec)}"
-            class="input font-mono" spellcheck="false" autocomplete="off" />
-          <button type="button" class="btn btn-ghost" id="peReveal"
-            aria-label="${t('profile.reveal')}" title="${t('profile.reveal')}">
-            ${Icons.eye}
-          </button>
-        </div>
-      </label>
-      <label class="fld">${t('login.publicKey')}
-        <input id="peNpub" type="text" readonly value="${this.escape(npub)}"
-          class="input font-mono" spellcheck="false" />
-      </label>`;
-
-    const reveal = content.querySelector('#peReveal');
-    reveal.addEventListener('click', () => {
-      const input = content.querySelector('#peNsec');
-      const show = input.type === 'password';
-      input.type = show ? 'text' : 'password';
-      reveal.innerHTML = show ? Icons.eyeOff : Icons.eye;
+    const nsecInput = input({
+      id: 'peNsec',
+      type: 'password',
+      readonly: true,
+      value: nsec,
+      class: 'input font-mono',
+      spellcheck: 'false',
+      autocomplete: 'off',
     });
+
+    const revealBtn = button({
+      type: 'button',
+      class: 'btn btn-ghost',
+      id: 'peReveal',
+      'aria-label': t('profile.reveal'),
+      title: t('profile.reveal'),
+      innerHTML: Icons.eye,
+      onclick: (e) => {
+        const show = nsecInput.type === 'password';
+        nsecInput.type = show ? 'text' : 'password';
+        e.currentTarget.innerHTML = show ? Icons.eyeOff : Icons.eye;
+      },
+    });
+
+    const content = div(
+      div(
+        { class: 'alert alert-warning', style: 'margin-bottom:14px' },
+        b({ style: 'display:block;margin-bottom:4px' }, t('profile.secretWarningTitle')),
+        span({ style: 'font-size:12.5px;line-height:1.5' }, t('profile.secretWarningBody'))
+      ),
+      label({ class: 'fld' }, t('profile.secretKey'), div({ class: 'key-field' }, nsecInput, revealBtn)),
+      label(
+        { class: 'fld' },
+        t('login.publicKey'),
+        input({
+          id: 'peNpub',
+          type: 'text',
+          readonly: true,
+          value: npub,
+          class: 'input font-mono',
+          spellcheck: 'false',
+        })
+      )
+    );
 
     modal.open({
       title: t('profile.backupKey'),
@@ -790,7 +1073,7 @@ export class ProfilePage extends Component {
 
   _downloadKey(nsec, npub) {
     const data = {
-      app: 'ZapJournal',
+      app: 'PocketZap',
       type: 'nostr-identity-backup',
       exported_at: new Date().toISOString(),
       npub,
@@ -799,7 +1082,7 @@ export class ProfilePage extends Component {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `zapjournal-key-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `pocketzap-key-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
     toast(t('profile.keyDownloaded'), 'warning');
@@ -807,7 +1090,7 @@ export class ProfilePage extends Component {
 
   _exportData() {
     const data = {
-      app: 'ZapJournal',
+      app: 'PocketZap',
       version: config.app.version,
       exported_at: new Date().toISOString(),
       transactions: store.get('transactions') || [],
@@ -825,15 +1108,15 @@ export class ProfilePage extends Component {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `zapjournal-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `pocketzap-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
     toast(t('profile.backupDownloaded'));
   }
 
   _addRelay() {
-    const input = this.$('.relay-input');
-    const url = (input?.value || '').trim();
+    const input2 = this.$('.relay-input');
+    const url = (input2?.value || '').trim();
     if (!url.startsWith('wss://')) {
       toast(t('profile.relayMustWss'), 'warning');
       return;
@@ -845,18 +1128,10 @@ export class ProfilePage extends Component {
       saved.push(url);
       storageService.setLocal(config.storage.keys.RELAYS, saved);
       nostrService.connect(url);
-      input.value = '';
+      input2.value = '';
       this.render();
       toast(t('profile.relayAdded'));
     }
-  }
-
-  afterRender() {
-    hydrateIcons(this.container);
-    // Fall back to the letter avatar if the profile picture fails to load.
-    this.$$('.avatar img').forEach((img) => {
-      img.addEventListener('error', () => img.remove(), { once: true });
-    });
   }
 }
 

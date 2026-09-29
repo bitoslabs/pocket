@@ -8,9 +8,9 @@
 export const config = {
     // App metadata
     app: {
-        name: 'ZapJournal',
+        name: 'PocketZap',
         version: '1.0.0',
-        description: 'Private journal and Lightning sats tracker on Nostr',
+        description: 'A personal zap journal by bitOS',
         homepage: 'https://bitos.space',
         repository: 'https://github.com/bitoslabs/pocket'
     },

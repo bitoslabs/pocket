@@ -6,8 +6,9 @@
 
 export default {
   common: {
-    appName: 'ZapJournal',
-    tagline: 'ວາລະສານສ່ວນຕົວ ແລະ ຕົວຕິດຕາມ sats ເທິງ Nostr',
+    appName: 'PocketZap',
+    tagline: 'ວາລະສານ zap ສ່ວນຕົວ ໂດຍ bitOS',
+    byBitOS: 'PocketZap ໂດຍ bitOS',
     cancel: 'ຍົກເລີກ',
     save: 'ບັນທຶກ',
     delete: 'ລຶບ',
@@ -50,7 +51,7 @@ export default {
 
   loader: {
     loading: 'ກຳລັງໂຫຼດມຸມສ່ວນຕົວຂອງທ່ານ…',
-    aria: 'ກຳລັງໂຫຼດ ZapJournal',
+    aria: 'ກຳລັງໂຫຼດ PocketZap',
   },
 
   header: {
@@ -79,7 +80,7 @@ export default {
     privateCorner: 'ມຸມສ່ວນຕົວຂອງທ່ານ',
     localModeTitle: 'ໂໝດໃນເຄື່ອງ',
     localModeBody:
-      'ທ່ານສາມາດໃຊ້ ZapJournal ໄດ້ໂດຍບໍ່ມີບັນຊີ — ທຸກຢ່າງຖືກເກັບໄວ້ໃນເຄື່ອງນີ້. ຂໍ້ມູນຈະບໍ່ຖືກເຂົ້າລະຫັດຈົນກວ່າທ່ານຈະເຊື່ອມຕໍ່ Nostr ແລະ ຈະຊິງອັດຕະໂນມັດຫຼັງຈາກເຂົ້າສູ່ລະບົບ.',
+      'ທ່ານສາມາດໃຊ້ PocketZap ໄດ້ໂດຍບໍ່ມີບັນຊີ — ທຸກຢ່າງຖືກເກັບໄວ້ໃນເຄື່ອງນີ້. ຂໍ້ມູນຈະບໍ່ຖືກເຂົ້າລະຫັດຈົນກວ່າທ່ານຈະເຊື່ອມຕໍ່ Nostr ແລະ ຈະຊິງອັດຕະໂນມັດຫຼັງຈາກເຂົ້າສູ່ລະບົບ.',
     connectTitle: 'ເຊື່ອມຕໍ່ Nostr',
     connectBody: 'ເຂົ້າສູ່ລະບົບເພື່ອຊິງ zap ຂອງທ່ານ ແລະ ເຂົ້າລະຫັດບັນທຶກວາລະສານ.',
     connectButton: 'ເຊື່ອມຕໍ່ດ້ວຍ Nostr',
@@ -281,13 +282,13 @@ export default {
     editProfile: 'ແກ້ໄຂໂປຣໄຟລ໌',
     nameBio: 'ຊື່ ແລະ bio',
     appLock: 'ລັອກແອັບ',
-    pinRequired: 'ຕ້ອງໃຊ້ PIN ເພື່ອເປີດ ZapJournal',
+    pinRequired: 'ຕ້ອງໃຊ້ PIN ເພື່ອເປີດ PocketZap',
     offNoPin: 'ປິດ · ບໍ່ຕ້ອງໃຊ້ PIN',
     changePin: 'ປ່ຽນ PIN',
     reLock: 'ລັອກວາລະສານອີກຄັ້ງດ້ວຍລະຫັດໃໝ່',
     export: 'ສົ່ງອອກຂໍ້ມູນ',
     exportSub: 'ດາວໂຫຼດທຸກຢ່າງເປັນ JSON — ດູແລດ້ວຍຕົນເອງ',
-    aboutApp: 'ກ່ຽວກັບ ZapJournal',
+    aboutApp: 'ກ່ຽວກັບ PocketZap',
     aboutSub: 'ຜູ້ຮ່ວມພັດທະນາ, ແຫຼ່ງຂໍ້ມູນ ແລະ ບໍລິຈາກ',
     reset: 'ຣີເຊັດແອັບ',
     resetSub: 'ລຶບບັນທຶກ ແລະ ລາຍການທັງໝົດ',
@@ -296,7 +297,7 @@ export default {
       'ການກະທຳນີ້ຈະລຶບບັນທຶກ, ລາຍການ ແລະ ການຕັ້ງຄ່າໃນເຄື່ອງທັງໝົດ. ຍ້ອນກັບບໍ່ໄດ້.',
     resetConfirm: 'ຣີເຊັດທັງໝົດ',
     lockOffTitle: 'ປິດລັອກແອັບ',
-    lockOffMessage: 'ZapJournal ຈະເປີດໂດຍບໍ່ຕ້ອງໃຊ້ PIN ເທິງອຸປະກອນນີ້.',
+    lockOffMessage: 'PocketZap ຈະເປີດໂດຍບໍ່ຕ້ອງໃຊ້ PIN ເທິງອຸປະກອນນີ້.',
     lockOffConfirm: 'ປິດ',
     displayName: 'ຊື່ທີ່ສະແດງ',
     bio: 'bio',
@@ -315,7 +316,7 @@ export default {
     backupKeySub: 'ເບິ່ງ, ຄັດລອກ ຫຼື ດາວໂຫຼດກະແຈລັບ (nsec)',
     keyManagedByExt: 'ຈັດການໂດຍສ່ວນຂະຫຍາຍຂອງບຣາວເຊີ',
     keyManagedByExtBody:
-      'ທ່ານເຂົ້າສູ່ລະບົບດ້ວຍສ່ວນຂະຫຍາຍບຣາວເຊີ (NIP-07), ດັ່ງນັ້ນກະແຈລັບຈຶ່ງບໍ່ອອກຈາກສ່ວນຂະຫຍາຍ. ສຳຮອງກະແຈຈາກສ່ວນຂະຫຍາຍ ຫຼື ກະເປົາເງິນຂອງທ່ານ — ZapJournal ເຫັນບໍ່ໄດ້.',
+      'ທ່ານເຂົ້າສູ່ລະບົບດ້ວຍສ່ວນຂະຫຍາຍບຣາວເຊີ (NIP-07), ດັ່ງນັ້ນກະແຈລັບຈຶ່ງບໍ່ອອກຈາກສ່ວນຂະຫຍາຍ. ສຳຮອງກະແຈຈາກສ່ວນຂະຫຍາຍ ຫຼື ກະເປົາເງິນຂອງທ່ານ — PocketZap ເຫັນບໍ່ໄດ້.',
     secretWarningTitle: 'ເກັບເປັນຄວາມລັບ',
     secretWarningBody:
       'ໃຜກໍ່ຕາມທີ່ມີກະແຈລັບຂອງທ່ານ ສາມາດຄວບຄຸມບັນຊີນີ້ໄດ້. ຢ່າແບ່ງປັນໃຫ້ໃຜ. ເກັບໄວ້ໃນບ່ອນທີ່ປອດໄພ ແລະ ອອບລາຍ.',
@@ -329,7 +330,7 @@ export default {
     backupDownloaded: 'ດາວໂຫຼດສຳຮອງແລ້ວ — ກະແຈຂອງທ່ານ, ຂໍ້ມູນຂອງທ່ານ ⚡',
     relayMustWss: 'URL ຂອງ relay ຕ້ອງເລີ່ມດ້ວຍ wss://',
     relayAdded: 'ເພີ່ມ relay ແລ້ວ',
-    footer: 'ສ່ວນຕົວ · ເກັບໃນເຄື່ອງກ່ອນ',
+    footer: 'ຂັບເຄື່ອນໂດຍເສດຖະກິດສັງຄົມແບບເປີດ',
     language: 'ພາສາ',
     languageSub: 'ພາສາທີ່ສະແດງໃນແອັບ',
   },
@@ -337,7 +338,7 @@ export default {
   about: {
     title: 'ກ່ຽວກັບ',
     tagline:
-      'ວາລະສານສ່ວນຕົວ ແລະ ຕົວຕິດຕາມ sats ເທິງ Nostr. ເກັບໃນເຄື່ອງກ່ອນ, ດູແລກະແຈເອງ, ເປັນຂອງທ່ານ.',
+      'ວາລະສານ zap ສ່ວນຕົວ ໂດຍ bitOS',
     source: 'ແຫຼ່ງຂໍ້ມູນ',
     whatsInside: 'ມີຫຍັງຢູ່ໃນ',
     featurePrivateTitle: 'ວາລະສານສ່ວນຕົວ',
@@ -348,7 +349,7 @@ export default {
     featureOfflineText: 'ຕິດຕັ້ງເປັນ PWA ໄດ້, ເກັບໃນເຄື່ອງກ່ອນ, ສົ່ງອອກທຸກຢ່າງໄດ້ທຸກເມື່ອ.',
     forceUpdate: 'ບັງຄັບອັບເດດ',
     forceUpdateSub: 'ລ້າງໄຟລ໌ແອັບທີ່ແຄຊໄວ້ ແລະ ໂຫຼດເວີຊັນຫຼ້າສຸດ',
-    updateOffline: 'ເຊື່ອມຕໍ່ອິນເຕີເນັດເພື່ອອັບເດດ ZapJournal',
+    updateOffline: 'ເຊື່ອມຕໍ່ອິນເຕີເນັດເພື່ອອັບເດດ PocketZap',
     updateInstalling: 'ກຳລັງຕິດຕັ້ງເວີຊັນຫຼ້າສຸດ…',
     updateReloading: 'ກຳລັງໂຫຼດເວີຊັນຫຼ້າສຸດ…',
     updateFailed: 'ກວດສອບການອັບເດດບໍ່ສຳເລັດ. ກະລຸນາລອງອີກຄັ້ງ.',
@@ -368,7 +369,7 @@ export default {
     copyOwner: 'ຄັດລອກ npub ເຈົ້າຂອງແລ້ວ',
     lnCopied: 'ຄັດລອກ Lightning address ແລ້ວ ⚡',
     stillNoLn: 'ຍັງບໍ່ພົບ Lightning address',
-    footer: 'ສ້າງໂດຍ bitos.space · ຈິດວິນຍານ MIT, ດູແລກະແຈດ້ວຍຕົນເອງຕະຫຼອດໄປ',
+    footer: 'ຂັບເຄື່ອນໂດຍເສດຖະກິດສັງຄົມແບບເປີດ',
   },
 
   lock: {

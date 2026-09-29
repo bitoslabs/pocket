@@ -1,7 +1,7 @@
 {
-  "name": "ZapJournal",
-  "short_name": "ZapJournal",
-  "description": "Private journal and Lightning sats tracker on Nostr",
+  "name": "PocketZap",
+  "short_name": "PocketZap",
+  "description": "A personal zap journal by bitOS",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0B0912",

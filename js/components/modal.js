@@ -1,18 +1,33 @@
 /**
  * Modal Component
  * Accessible modal dialog
- * 
+ *
+ * VanJS view: the modal chrome is built with `van.tags`; content may be an
+ * HTML string (legacy) or VanJS node(s). `confirm`/`alert` pass node content,
+ * so their messages are escaped automatically.
+ *
  * @module components/modal
  */
 
 import { eventBus, Events } from '../core/event-bus.js';
 import { store } from '../core/state.js';
 import { t } from '../core/i18n.js';
+import van from '../vendor/van.js';
+
+const { button, div, h2, p } = van.tags;
+
+const CLOSE_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>`;
 
 class ModalManager {
     constructor() {
         this._overlay = null;
         this._modal = null;
+        this._titleEl = null;
+        this._bodyEl = null;
+        this._footerEl = null;
         this._previousFocus = null;
         this._init();
     }
@@ -22,32 +37,25 @@ class ModalManager {
      * @private
      */
     _init() {
-        // Create overlay
-        this._overlay = document.createElement('div');
-        this._overlay.className = 'modal-overlay';
-        this._overlay.setAttribute('aria-hidden', 'true');
+        this._titleEl = h2({ class: 'modal-title' });
+        this._bodyEl = div({ class: 'modal-body' });
+        this._footerEl = div({ class: 'modal-footer' });
 
-        // Create modal
-        this._modal = document.createElement('div');
-        this._modal.className = 'modal';
-        this._modal.setAttribute('role', 'dialog');
-        this._modal.setAttribute('aria-modal', 'true');
+        const closeBtn = button({
+            class: 'modal-close btn-icon btn-ghost',
+            'aria-label': t('common.close'),
+            innerHTML: CLOSE_SVG,
+            onclick: () => this.close(),
+        });
 
-        this._modal.innerHTML = `
-      <div class="modal-header">
-        <h2 class="modal-title"></h2>
-        <button class="modal-close btn-icon btn-ghost" aria-label="${t('common.close')}">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-      <div class="modal-body"></div>
-      <div class="modal-footer"></div>
-    `;
+        this._modal = div(
+            { class: 'modal', role: 'dialog', 'aria-modal': 'true' },
+            div({ class: 'modal-header' }, this._titleEl, closeBtn),
+            this._bodyEl,
+            this._footerEl
+        );
 
-        this._overlay.appendChild(this._modal);
+        this._overlay = div({ class: 'modal-overlay', 'aria-hidden': 'true' }, this._modal);
         document.body.appendChild(this._overlay);
 
         // Event listeners
@@ -55,10 +63,6 @@ class ModalManager {
             if (e.target === this._overlay) {
                 this.close();
             }
-        });
-
-        this._modal.querySelector('.modal-close').addEventListener('click', () => {
-            this.close();
         });
 
         // Keyboard handling
@@ -103,35 +107,29 @@ class ModalManager {
         this._previousFocus = document.activeElement;
 
         // Set title
-        const titleEl = this._modal.querySelector('.modal-title');
-        titleEl.textContent = title;
+        this._titleEl.textContent = title;
+        this._titleEl.id = 'modal-title';
         this._modal.setAttribute('aria-labelledby', 'modal-title');
-        titleEl.id = 'modal-title';
-
-        const closeBtn = this._modal.querySelector('.modal-close');
-        if (closeBtn) closeBtn.setAttribute('aria-label', t('common.close'));
+        this._modal.querySelector('.modal-close')?.setAttribute('aria-label', t('common.close'));
 
         // Set content — accept an HTML string (legacy) or VanJS node(s).
-        const bodyEl = this._modal.querySelector('.modal-body');
         if (typeof content === 'string') {
-            bodyEl.innerHTML = content;
+            this._bodyEl.innerHTML = content;
         } else if (content instanceof Node) {
-            bodyEl.replaceChildren(content);
+            this._bodyEl.replaceChildren(content);
         } else if (Array.isArray(content)) {
-            bodyEl.replaceChildren(...content);
+            this._bodyEl.replaceChildren(...content);
         }
 
         // Set footer actions
-        const footerEl = this._modal.querySelector('.modal-footer');
-        footerEl.innerHTML = '';
-
+        this._footerEl.innerHTML = '';
         if (actions.length > 0) {
-            footerEl.style.display = '';
-            actions.forEach(action => {
-                const button = document.createElement('button');
-                button.className = `btn ${action.variant || 'btn-secondary'}`;
-                button.textContent = action.label;
-                button.addEventListener('click', () => {
+            this._footerEl.style.display = '';
+            actions.forEach((action) => {
+                const buttonEl = document.createElement('button');
+                buttonEl.className = `btn ${action.variant || 'btn-secondary'}`;
+                buttonEl.textContent = action.label;
+                buttonEl.addEventListener('click', () => {
                     if (action.handler) {
                         const result = action.handler();
                         if (result !== false && action.closeOnClick !== false) {
@@ -141,10 +139,10 @@ class ModalManager {
                         this.close();
                     }
                 });
-                footerEl.appendChild(button);
+                this._footerEl.appendChild(buttonEl);
             });
         } else {
-            footerEl.style.display = 'none';
+            this._footerEl.style.display = 'none';
         }
 
         // Store close callback
@@ -208,7 +206,7 @@ class ModalManager {
         return new Promise((resolve) => {
             this.open({
                 title,
-                content: `<p>${message}</p>`,
+                content: p(message),
                 actions: [
                     {
                         label: cancelText || t('common.cancel'),
@@ -239,7 +237,7 @@ class ModalManager {
         return new Promise((resolve) => {
             this.open({
                 title,
-                content: `<p>${message}</p>`,
+                content: p(message),
                 actions: [
                     {
                         label: buttonText || t('common.ok'),
@@ -251,23 +249,9 @@ class ModalManager {
             });
         });
     }
-
-    /**
-     * Get the modal body element
-     * @returns {HTMLElement}
-     */
-    getContent() {
-        return this._modal.querySelector('.modal-body');
-    }
 }
 
 // Singleton instance
 export const modal = new ModalManager();
-
-// Convenience functions
-export const openModal = (options) => modal.open(options);
-export const closeModal = () => modal.close();
-export const confirm = (options) => modal.confirm(options);
-export const alert = (options) => modal.alert(options);
 
 export default modal;

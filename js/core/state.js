@@ -188,22 +188,4 @@ const initialState = {
 // Singleton store instance
 export const store = new Store(initialState);
 
-// Helper: Create a computed value that updates when dependencies change
-export function computed(dependencies, computeFn) {
-    let cachedValue = null;
-    let lastDeps = null;
-
-    return () => {
-        const currentDeps = dependencies.map(dep => store.get(dep));
-        const depsChanged = !lastDeps || currentDeps.some((dep, i) => dep !== lastDeps[i]);
-
-        if (depsChanged) {
-            cachedValue = computeFn(...currentDeps);
-            lastDeps = currentDeps;
-        }
-
-        return cachedValue;
-    };
-}
-
 export default store;

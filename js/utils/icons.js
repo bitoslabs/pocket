@@ -1,11 +1,10 @@
 /**
  * Shared SVG Icons
- * Ported from the ZapJournal design (docs/ex.html) plus legacy icons.
+ * Ported from the PocketZap design (docs/ex.html) plus legacy icons.
  *
- * Usage:
- *   import { Icons, hydrateIcons } from '../utils/icons.js';
- *   `<span class="ic">${Icons.bolt}</span>`
- *   hydrateIcons(document); // fills every [data-icon="name"]
+ * Usage (VanJS):
+ *   import { Icons } from '../utils/icons.js';
+ *   span({ class: 'ic', innerHTML: Icons.bolt })
  */
 
 const stroke = (paths) =>
@@ -105,19 +104,5 @@ export const Icons = {
   Moon: stroke('<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'),
   Check: stroke('<polyline points="20 6 9 17 4 12"/>'),
 };
-
-/**
- * Fill all [data-icon] elements within a root with the matching icon.
- * @param {ParentNode} [root=document]
- */
-export function hydrateIcons(root = document) {
-  root.querySelectorAll("[data-icon]").forEach((el) => {
-    const name = el.dataset.icon;
-    if (name && Icons[name] && !el.dataset.iconHydrated) {
-      el.innerHTML = Icons[name];
-      el.dataset.iconHydrated = "1";
-    }
-  });
-}
 
 export default Icons;

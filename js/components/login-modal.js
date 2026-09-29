@@ -1,7 +1,9 @@
 /**
  * Login Modal Component
  * UI for choosing authentication method (Extension, nsec, or Generate)
- * 
+ *
+ * VanJS view: both dialogs are built with `van.tags` and use inline handlers.
+ *
  * @module components/login-modal
  */
 
@@ -9,6 +11,11 @@ import { modal } from './modal.js';
 import { t } from '../core/i18n.js';
 import { authService } from '../services/auth-service.js';
 import { eventBus, Events } from '../core/event-bus.js';
+import van from '../vendor/van.js';
+
+const { button, div, h3, input, label, p, span } = van.tags;
+
+const toast = (type, message) => eventBus.emit(Events.TOAST_SHOW, { type, message });
 
 export class LoginModal {
     constructor() {
@@ -21,139 +28,157 @@ export class LoginModal {
     }
 
     show() {
-        const content = document.createElement('div');
-        content.className = 'login-options';
-        content.innerHTML = `
-            <div class="login-option-list flex flex-col gap-3">
-                <!-- NIP-07 Extension -->
-                <button class="btn btn-lg btn-outline flex items-center justify-between p-4" id="login-ext">
-                    <div class="flex items-center gap-3">
-                        <span class="text-2xl">🔌</span>
-                        <div class="text-left">
-                            <div class="font-bold">${t('login.extension')}</div>
-                            <div class="text-xs text-secondary">${t('login.extensionSub')}</div>
-                        </div>
-                    </div>
-                    <span>→</span>
-                </button>
+        const content = div({ class: 'login-options' });
 
-                <div class="divider text-center text-secondary text-sm my-2">${t('login.or')}</div>
+        const extBtn = button(
+            {
+                class: 'btn btn-lg btn-outline flex items-center justify-between p-4',
+                id: 'login-ext',
+                onclick: async () => {
+                    try {
+                        await authService.login();
+                        modal.close();
+                        toast('success', t('login.connectedExt'));
+                    } catch (err) {
+                        // Error already handled/emitted by authService
+                    }
+                },
+            },
+            div(
+                { class: 'flex items-center gap-3' },
+                span({ class: 'text-2xl' }, '🔌'),
+                div(
+                    { class: 'text-left' },
+                    div({ class: 'font-bold' }, t('login.extension')),
+                    div({ class: 'text-xs text-secondary' }, t('login.extensionSub'))
+                )
+            ),
+            span('→')
+        );
 
-                <!-- nsec Login -->
-                <div class="join w-full">
-                    <input type="password" 
-                           id="nsec-input" 
-                           class="input input-bordered join-item w-full" 
-                           placeholder="${t('login.nsecPlaceholder')}"
-                    />
-                    <button class="btn btn-primary join-item" id="login-nsec">
-                        ${t('login.login')}
-                    </button>
-                </div>
-                <p class="text-xs text-secondary text-center mb-2">
-                    ${t('login.nsecHint')}
-                </p>
-
-                <div class="divider text-center text-secondary text-sm my-2">${t('login.or')}</div>
-
-                <!-- Generate New -->
-                <button class="btn btn-secondary flex items-center justify-center gap-2" id="login-gen">
-                    <span>✨</span>
-                    <span>${t('login.generate')}</span>
-                </button>
-            </div>
-        `;
-
-        // Bind clicks within the modal content
-        // Extension Login
-        content.querySelector('#login-ext').addEventListener('click', async () => {
-            try {
-                await authService.login();
-                modal.close();
-                eventBus.emit(Events.TOAST_SHOW, { type: 'success', message: t('login.connectedExt') });
-            } catch (err) {
-                // Error already handled/emitted by authService
-            }
+        const nsecInput = input({
+            type: 'password',
+            id: 'nsec-input',
+            class: 'input input-bordered join-item w-full',
+            placeholder: t('login.nsecPlaceholder'),
         });
 
-        // nsec Login
-        content.querySelector('#login-nsec').addEventListener('click', async () => {
-            const input = content.querySelector('#nsec-input');
-            const nsec = input.value.trim();
-            if (!nsec) return;
+        const nsecBtn = button(
+            {
+                class: 'btn btn-primary join-item',
+                id: 'login-nsec',
+                onclick: async () => {
+                    const nsec = nsecInput.value.trim();
+                    if (!nsec) return;
+                    try {
+                        await authService.loginWithSecret(nsec);
+                        modal.close();
+                        toast('success', t('login.loggedInKey'));
+                    } catch (err) {
+                        toast('error', err.message);
+                    }
+                },
+            },
+            t('login.login')
+        );
 
-            try {
-                await authService.loginWithSecret(nsec);
-                modal.close();
-                eventBus.emit(Events.TOAST_SHOW, { type: 'success', message: t('login.loggedInKey') });
-            } catch (err) {
-                eventBus.emit(Events.TOAST_SHOW, { type: 'error', message: err.message });
-            }
-        });
+        const genBtn = button(
+            {
+                class: 'btn btn-secondary flex items-center justify-center gap-2',
+                id: 'login-gen',
+                onclick: async () => {
+                    try {
+                        const user = await authService.generateNewAccount();
+                        modal.close();
+                        setTimeout(() => this._showNewAccountKeys(user), 500);
+                    } catch (err) {
+                        toast('error', err.message);
+                    }
+                },
+            },
+            span('✨'),
+            span(t('login.generate'))
+        );
 
-        // Generate Account
-        content.querySelector('#login-gen').addEventListener('click', async () => {
-            try {
-                const user = await authService.generateNewAccount();
-                modal.close();
+        van.add(
+            content,
+            div(
+                { class: 'login-option-list flex flex-col gap-3' },
+                extBtn,
+                div({ class: 'divider text-center text-secondary text-sm my-2' }, t('login.or')),
+                div({ class: 'join w-full' }, nsecInput, nsecBtn),
+                p(
+                    { class: 'text-xs text-secondary text-center mb-2' },
+                    t('login.nsecHint')
+                ),
+                div({ class: 'divider text-center text-secondary text-sm my-2' }, t('login.or')),
+                genBtn
+            )
+        );
 
-                // Show user their new key
-                setTimeout(() => {
-                    this._showNewAccountKeys(user);
-                }, 500);
-
-            } catch (err) {
-                eventBus.emit(Events.TOAST_SHOW, { type: 'error', message: err.message });
-            }
-        });
-
-        modal.open({
-            title: t('login.title'),
-            content: content
-        });
+        modal.open({ title: t('login.title'), content });
     }
 
     _showNewAccountKeys(user) {
-        const content = document.createElement('div');
-        content.innerHTML = `
-            <div class="alert alert-warning mb-4">
-                <h3 class="font-bold">${t('login.saveSecretTitle')}</h3>
-                <p class="text-sm">${t('login.saveSecretBody')}</p>
-            </div>
-
-            <div class="form-control mb-4">
-                <label class="label"><span class="label-text">${t('login.secretKey')}</span></label>
-                <div class="join w-full">
-                    <input type="text" readonly value="${user.nsec}" class="input input-bordered join-item w-full font-mono text-sm" id="key-nsec" />
-                    <button class="btn join-item" id="copy-nsec">${t('common.copy')}</button>
-                </div>
-            </div>
-
-            <div class="form-control mb-6">
-                <label class="label"><span class="label-text">${t('login.publicKey')}</span></label>
-                <div class="join w-full">
-                    <input type="text" readonly value="${user.npub}" class="input input-bordered join-item w-full font-mono text-sm" />
-                </div>
-            </div>
-        `;
-
-        content.querySelector('#copy-nsec').addEventListener('click', () => {
-            const el = content.querySelector('#key-nsec');
-            el.select();
-            document.execCommand('copy');
-            eventBus.emit(Events.TOAST_SHOW, { type: 'success', message: t('common.copied') });
+        const nsecField = input({
+            type: 'text',
+            readonly: true,
+            value: user.nsec,
+            class: 'input input-bordered join-item w-full font-mono text-sm',
+            id: 'key-nsec',
         });
+
+        const content = div(
+            div(
+                { class: 'alert alert-warning mb-4' },
+                h3({ class: 'font-bold' }, t('login.saveSecretTitle')),
+                p({ class: 'text-sm' }, t('login.saveSecretBody'))
+            ),
+            div(
+                { class: 'form-control mb-4' },
+                label({ class: 'label' }, span({ class: 'label-text' }, t('login.secretKey'))),
+                div(
+                    { class: 'join w-full' },
+                    nsecField,
+                    button(
+                        {
+                            class: 'btn join-item',
+                            id: 'copy-nsec',
+                            onclick: () => {
+                                nsecField.select();
+                                document.execCommand('copy');
+                                toast('success', t('common.copied'));
+                            },
+                        },
+                        t('common.copy')
+                    )
+                )
+            ),
+            div(
+                { class: 'form-control mb-6' },
+                label({ class: 'label' }, span({ class: 'label-text' }, t('login.publicKey'))),
+                div(
+                    { class: 'join w-full' },
+                    input({
+                        type: 'text',
+                        readonly: true,
+                        value: user.npub,
+                        class: 'input input-bordered join-item w-full font-mono text-sm',
+                    })
+                )
+            )
+        );
 
         modal.open({
             title: t('login.newAccountTitle'),
-            content: content,
+            content,
             actions: [
                 {
                     label: t('login.savedKey'),
                     variant: 'btn-primary',
-                    handler: () => true // Close modal
-                }
-            ]
+                    handler: () => true, // Close modal
+                },
+            ],
         });
     }
 }

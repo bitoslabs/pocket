@@ -112,6 +112,7 @@ export const Events = {
     AUTH_LOGIN: 'auth:login',
     AUTH_LOGOUT: 'auth:logout',
     AUTH_ERROR: 'auth:error',
+    AUTH_REQUEST_LOGIN: 'auth:request-login',
 
     // Relay events
     RELAY_CONNECTED: 'relay:connected',

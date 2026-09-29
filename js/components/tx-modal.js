@@ -1,6 +1,10 @@
 /**
  * Transaction Modal - log / edit income & expense
  *
+ * VanJS view: direction, category, unit and the fiat preview are reactive
+ * states, so the old manual `renderCats()` / `refreshSeg()` DOM patching is gone.
+ * The amount/note inputs stay uncontrolled and are read on save.
+ *
  * @module components/tx-modal
  */
 
@@ -11,6 +15,9 @@ import { categoryService } from '../services/category-service.js';
 import { priceService } from '../services/price-service.js';
 import { Icons } from '../utils/icons.js';
 import { categoryMeta, fmtSats, playFX, toast } from '../utils/ui.js';
+import van from '../vendor/van.js';
+
+const { button, div, input, span } = van.tags;
 
 const DIR_TO_TYPE = { out: 'expense', in: 'income' };
 const TYPE_TO_DIR = { expense: 'out', income: 'in' };
@@ -22,116 +29,60 @@ const TYPE_TO_DIR = { expense: 'out', income: 'in' };
  * @param {Function} opts.onSaved
  */
 export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
-  const state = {
-    dir,
-    cat: null,
-  };
-
   const fiatOn = priceService.showFiat && priceService.hasRate(priceService.currency);
   const currency = priceService.currency;
 
-  const content = document.createElement('div');
-  content.className = 'tx-modal';
+  const dirState = van.state(tx ? TYPE_TO_DIR[tx.type] || 'out' : dir);
+  const catState = van.state(tx?.category || null);
+  const unitState = van.state('sats');
+  const previewState = van.state('');
 
-  const segBtnCls = (d) =>
-    state.dir === d ? (d === 'out' ? 'on-out' : 'on-in') : '';
+  const catsFor = (d) => categoryService.getCategories(DIR_TO_TYPE[d]);
 
-  const catsFor = (d) => {
-    const type = DIR_TO_TYPE[d];
-    const cats = categoryService.getCategories(type);
-    if (!state.cat || !cats.some((c) => c.id === state.cat)) {
-      state.cat = cats[0]?.id || 'other';
-    }
-    return cats;
-  };
+  const amtInput = input({
+    id: 'txAmt',
+    type: 'number',
+    min: '0',
+    inputmode: 'decimal',
+    placeholder: '0',
+    autocomplete: 'off',
+    value: tx?.amount || '',
+    oninput: () => renderFiatPreview(),
+  });
 
-  const renderCats = () => {
-    const cats = catsFor(state.dir);
-    content.querySelector('#txCats').innerHTML = cats
-      .map((c) => {
-        const meta = categoryMeta(c.id);
-        return `<button type="button" class="cat-chip ${state.cat === c.id ? 'on' : ''}"
-          style="--cc:${meta.color}" data-cat="${c.id}">
-          <span class="ic" style="color:${meta.color}">${Icons[meta.icon] || Icons.file}</span>${c.name || meta.label}
-        </button>`;
-      })
-      .join('');
-  };
-
-  content.innerHTML = `
-    <div class="seg" style="margin-top:8px">
-      <button type="button" id="txSegOut" class="${segBtnCls('out')}">
-        <span class="ic">${Icons.upRight}</span>${t('tx.expense')}
-      </button>
-      <button type="button" id="txSegIn" class="${segBtnCls('in')}">
-        <span class="ic">${Icons.downLeft}</span>${t('tx.income')}
-      </button>
-    </div>
-    <div class="amt-line">
-      <input id="txAmt" type="number" min="0" inputmode="decimal" placeholder="0" autocomplete="off" />
-      ${
-        fiatOn
-          ? `<button type="button" class="unit-toggle" id="txUnit" aria-label="${t(
-              'tx.switchUnit'
-            )}">
-               <span data-unit="sats">${t('common.sats')}</span>
-               <span data-unit="fiat">${currency}</span>
-             </button>`
-          : `<span>${t('common.sats')}</span>`
-      }
-    </div>
-    ${fiatOn ? `<div class="fiat-preview" id="txFiatPreview"></div>` : ''}
-    <div class="cat-chips" id="txCats"></div>
-    <input id="txNote" class="note-input" style="margin-top:12px"
-      placeholder="${t('tx.notePlaceholder')}" maxlength="80" autocomplete="off" />
-  `;
-
-  const amtInput = content.querySelector('#txAmt');
-  const unitToggle = content.querySelector('#txUnit');
-  let unit = 'sats'; // which unit the amount input is entered in
-
-  if (tx) {
-    state.dir = TYPE_TO_DIR[tx.type] || 'out';
-    state.cat = tx.category || null;
-    amtInput.value = tx.amount || '';
-    content.querySelector('#txNote').value = tx.description || '';
-  }
-
-  // Live "sats ~ fiat" preview (e.g. "100 sats ~ ₭500")
-  const fiatPreview = content.querySelector('#txFiatPreview');
+  const noteInput = input({
+    id: 'txNote',
+    class: 'note-input',
+    style: 'margin-top:12px',
+    placeholder: t('tx.notePlaceholder'),
+    maxlength: '80',
+    autocomplete: 'off',
+    value: tx?.description || '',
+  });
 
   const amountToSats = () => {
     const v = parseFloat(amtInput.value);
     if (!(v > 0)) return 0;
-    return unit === 'fiat' ? priceService.fiatToSats(v) : Math.round(v);
+    return unitState.val === 'fiat' ? priceService.fiatToSats(v) : Math.round(v);
   };
 
-  const renderFiatPreview = () => {
-    if (!fiatPreview) return;
+  function renderFiatPreview() {
+    if (!fiatOn) return;
     const v = parseFloat(amtInput.value);
     if (!(v > 0)) {
-      fiatPreview.textContent = '';
+      previewState.val = '';
       return;
     }
-    const sats = unit === 'fiat' ? priceService.fiatToSats(v) : Math.round(v);
-    const fiat = unit === 'fiat' ? v : priceService.satsToFiat(v);
-    fiatPreview.textContent =
+    const sats = unitState.val === 'fiat' ? priceService.fiatToSats(v) : Math.round(v);
+    const fiat = unitState.val === 'fiat' ? v : priceService.satsToFiat(v);
+    previewState.val =
       sats > 0 && fiat > 0
         ? `${fmtSats(sats)} ${t('common.sats')} ~ ${priceService.formatAmount(fiat, currency)}`
         : '';
-  };
-
-  const refreshUnit = () => {
-    if (unitToggle) {
-      unitToggle.querySelectorAll('span').forEach((s) => {
-        s.classList.toggle('on', s.dataset.unit === unit);
-      });
-    }
-    renderFiatPreview();
-  };
+  }
 
   const setUnit = (next) => {
-    if (!fiatOn || next === unit) return;
+    if (!fiatOn || next === unitState.val) return;
     const v = parseFloat(amtInput.value);
     if (v > 0) {
       amtInput.value =
@@ -139,42 +90,95 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
           ? priceService.satsToFiat(v).toFixed(2)
           : priceService.fiatToSats(v);
     }
-    unit = next;
-    refreshUnit();
+    unitState.val = next;
+    renderFiatPreview();
   };
 
-  if (fiatOn) {
-    amtInput.addEventListener('input', renderFiatPreview);
-    unitToggle?.addEventListener('click', (e) => {
-      const span = e.target.closest('span[data-unit]');
-      setUnit(span ? span.dataset.unit : unit === 'sats' ? 'fiat' : 'sats');
-    });
-    refreshUnit();
-  }
+  const segBtn = (d, id, icon, labelKey) =>
+    button(
+      {
+        type: 'button',
+        id,
+        class: () => (dirState.val === d ? (d === 'out' ? 'on-out' : 'on-in') : ''),
+        onclick: () => {
+          dirState.val = d;
+          catState.val = null;
+        },
+      },
+      span({ class: 'ic', innerHTML: Icons[icon] }),
+      t(labelKey)
+    );
 
-  const refreshSeg = () => {
-    content.querySelector('#txSegOut').className = segBtnCls('out');
-    content.querySelector('#txSegIn').className = segBtnCls('in');
-  };
+  const unitToggle = fiatOn
+    ? button(
+        {
+          type: 'button',
+          class: 'unit-toggle',
+          id: 'txUnit',
+          'aria-label': t('tx.switchUnit'),
+          onclick: (e) => {
+            const s = e.target.closest('span[data-unit]');
+            setUnit(s ? s.dataset.unit : unitState.val === 'sats' ? 'fiat' : 'sats');
+          },
+        },
+        span(
+          { 'data-unit': 'sats', class: () => (unitState.val === 'sats' ? 'on' : '') },
+          t('common.sats')
+        ),
+        span(
+          { 'data-unit': 'fiat', class: () => (unitState.val === 'fiat' ? 'on' : '') },
+          currency
+        )
+      )
+    : span(t('common.sats'));
 
-  renderCats();
-  refreshSeg();
-
-  content.addEventListener('click', (e) => {
-    const seg = e.target.closest('#txSegOut, #txSegIn');
-    if (seg) {
-      state.dir = seg.id === 'txSegIn' ? 'in' : 'out';
-      state.cat = null;
-      refreshSeg();
-      renderCats();
-      return;
+  const catsEl = div({ class: 'cat-chips', id: 'txCats' });
+  van.derive(() => {
+    const d = dirState.val;
+    const cats = catsFor(d);
+    let sel = catState.val;
+    if (!sel || !cats.some((c) => c.id === sel)) {
+      sel = cats[0]?.id || 'other';
+      catState.val = sel;
     }
-    const cat = e.target.closest('.cat-chip');
-    if (cat) {
-      state.cat = cat.dataset.cat;
-      renderCats();
-    }
+    catsEl.replaceChildren();
+    van.add(
+      catsEl,
+      cats.map((c) => {
+        const meta = categoryMeta(c.id);
+        return button(
+          {
+            type: 'button',
+            class: `cat-chip ${sel === c.id ? 'on' : ''}`,
+            style: `--cc:${meta.color}`,
+            'data-cat': c.id,
+            onclick: () => {
+              catState.val = c.id;
+            },
+          },
+          span({
+            class: 'ic',
+            style: `color:${meta.color}`,
+            innerHTML: Icons[meta.icon] || Icons.file,
+          }),
+          c.name || meta.label
+        );
+      })
+    );
   });
+
+  const content = div(
+    { class: 'tx-modal' },
+    div(
+      { class: 'seg', style: 'margin-top:8px' },
+      segBtn('out', 'txSegOut', 'upRight', 'tx.expense'),
+      segBtn('in', 'txSegIn', 'downLeft', 'tx.income')
+    ),
+    div({ class: 'amt-line' }, amtInput, unitToggle),
+    fiatOn ? div({ class: 'fiat-preview', id: 'txFiatPreview' }, () => previewState.val) : null,
+    catsEl,
+    noteInput
+  );
 
   const actions = [];
   if (tx) {
@@ -200,17 +204,18 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
         toast(t('tx.enterAmount'), 'error');
         return false;
       }
-      const note = content.querySelector('#txNote').value.trim();
-      const type = DIR_TO_TYPE[state.dir];
+      const note = noteInput.value.trim();
+      const type = DIR_TO_TYPE[dirState.val];
+      const cat = catState.val;
 
       // Snapshot the fiat value at the time of entry (when shown)
       let fiatAmount;
       if (fiatOn) {
         const v = parseFloat(amtInput.value);
-        fiatAmount = unit === 'fiat' && v > 0 ? v : priceService.satsToFiat(amt);
+        fiatAmount = unitState.val === 'fiat' && v > 0 ? v : priceService.satsToFiat(amt);
       }
 
-      const payload = { type, category: state.cat, amount: amt, description: note };
+      const payload = { type, category: cat, amount: amt, description: note };
       if (fiatOn && Number.isFinite(fiatAmount)) {
         payload.fiatAmount = fiatAmount;
         payload.currency = currency;
@@ -222,7 +227,7 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
           toast(t('tx.transactionUpdated'));
         } else {
           const created = await zapService.createManualTransaction(payload);
-          if (type === 'income' || state.cat === 'tips' || state.cat === 'zaps') {
+          if (type === 'income' || cat === 'tips' || cat === 'zaps') {
             playFX(amt, type === 'income');
           }
           toast(
@@ -248,7 +253,7 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
   modal.open({
     title: tx
       ? t('tx.editTitle')
-      : state.dir === 'in'
+      : dirState.val === 'in'
       ? t('tx.logIncome')
       : t('tx.logExpense'),
     content,

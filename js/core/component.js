@@ -7,6 +7,8 @@
 
 import { store } from './state.js';
 import { eventBus, Events } from './event-bus.js';
+import { escapeHtml } from '../utils/html.js';
+import van from '../vendor/van.js';
 
 export class Component {
     /**
@@ -121,8 +123,17 @@ export class Component {
 
         this.beforeRender();
 
-        const html = this.template();
-        this.container.innerHTML = html;
+        const output = this.template();
+
+        // VanJS views return DOM nodes (or an array of them); string templates
+        // keep the legacy innerHTML path so existing components are unaffected.
+        if (output instanceof Node) {
+            this.container.replaceChildren(output);
+        } else if (Array.isArray(output)) {
+            this.container.replaceChildren(...output);
+        } else {
+            this.container.innerHTML = output;
+        }
 
         // Bind events after render
         this.bindEvents();
@@ -131,8 +142,8 @@ export class Component {
     }
 
     /**
-     * Override this method to provide component HTML
-     * @returns {string} HTML string
+     * Override this method to provide component output
+     * @returns {string|Node|Array<Node>} HTML string (legacy) or VanJS node(s)
      */
     template() {
         return '';
@@ -187,6 +198,22 @@ export class Component {
     watchEvent(event, callback) {
         const unsubscribe = eventBus.on(event, callback.bind(this));
         this._subscriptions.push(unsubscribe);
+    }
+
+    /**
+     * Mirror a global store path as a VanJS state, kept in sync with the store
+     * and unsubscribed automatically on unmount. The VanJS counterpart of
+     * watchStore(): views read `state.val` instead of forcing a full re-render.
+     * @param {string} path - Store path to mirror (e.g. 'ui.currentRoute')
+     * @returns {Object} VanJS state whose `.val` tracks the store
+     */
+    storeState(path) {
+        const state = van.state(store.get(path));
+        const unsubscribe = store.subscribe(path, (value) => {
+            if (value !== state.val) state.val = value;
+        });
+        this._subscriptions.push(unsubscribe);
+        return state;
     }
 
     // ==================== DOM Helpers ====================
@@ -251,10 +278,7 @@ export class Component {
      * @returns {string} Escaped string
      */
     escape(str) {
-        if (str === null || str === undefined) return '';
-        const div = document.createElement('div');
-        div.textContent = str
-        return div.innerHTML;
+        return escapeHtml(str);
     }
 
     /**

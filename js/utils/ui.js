@@ -6,24 +6,18 @@
  */
 
 import { eventBus, Events } from '../core/event-bus.js';
-import { store } from '../core/state.js';
 import { t, locale } from '../core/i18n.js';
 import { priceService } from '../services/price-service.js';
 import { Icons } from './icons.js';
+import { escapeHtml } from './html.js';
+
+export { escapeHtml };
 
 export const $ = (sel, ctx = document) => ctx.querySelector(sel);
 export const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
 
 export const uid = () =>
   Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-
-export function escapeHtml(str) {
-  if (str === null || str === undefined) return '';
-  return String(str).replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
-  );
-}
 
 /* ==================== Time ==================== */
 
@@ -243,31 +237,6 @@ export function greeting(hour = new Date().getHours()) {
   if (hour < 12) return t('dashboard.greetingMorning');
   if (hour < 18) return t('dashboard.greetingAfternoon');
   return t('dashboard.greetingEvening');
-}
-
-/** Render a ledger row. `linkedIds` is an optional Set of transaction ids. */
-export function txRowHtml(tx, linkedIds = null) {
-  const meta = categoryMeta(tx.category);
-  const income = isIncome(tx);
-  const dir = income ? 'in' : 'out';
-  const linked = linkedIds && linkedIds.has(tx.id);
-  const fiat = priceService.showFiat ? priceService.fiatFor(tx) : '';
-  const pending = (store.get('sync')?.pendingIds || []).includes(`transaction:${tx.id}`);
-  return `<button class="tx" data-action="edit-tx" data-id="${tx.id}">
-    <span class="tx-ic" style="background:${meta.color}1F">
-      <span class="ic" style="color:${meta.color}">${Icons[meta.icon] || Icons.file}</span>
-    </span>
-    <div class="tx-body">
-      <b>${escapeHtml(tx.description || meta.label)}${pending ? ' <i class="tx-pending" title="Waiting to sync"></i>' : ''}</b>
-      <span>${meta.label} · ${fmtTime(tx.created_at)}${
-    linked ? ` · <i class="tx-link">✎ ${t('journal.title')}</i>` : ''
-  }</span>
-    </div>
-    <span class="tx-amt ${dir}">
-      <span class="tx-sats">${income ? '+' : '−'}${fmtSats(amountOf(tx))}</span>
-      ${fiat ? `<span class="tx-fiat">${fiat}</span>` : ''}
-    </span>
-  </button>`;
 }
 
 /** Fiat string for a sats amount, or '' when fiat display is off. */

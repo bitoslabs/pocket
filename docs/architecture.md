@@ -42,11 +42,13 @@ The guiding principle is **local-first**: every action is written to the local d
 │   ├── app.js              # Main orchestrator / service wiring
 │   ├── config.js           # Centralized config (frozen)
 │   ├── router.js           # SPA routing
+│   ├── vendor/
+│   │   └── van.js          # Vendored VanJS (reactive UI, MIT)
 │   ├── core/
 │   │   ├── account.js      # Owner scoping (pubkey vs 'guest')
 │   │   ├── event-bus.js    # Pub/sub + Events constants
 │   │   ├── state.js        # Reactive state store
-│   │   ├── component.js    # Base component class
+│   │   ├── component.js    # Base component class (string or VanJS views)
 │   │   └── theme.js        # Dark/light + accent color
 │   ├── services/
 │   │   ├── storage-service.js      # IndexedDB (+ LocalStorage fallback)
@@ -61,12 +63,12 @@ The guiding principle is **local-first**: every action is written to the local d
 │   │   ├── recurring-service.js
 │   │   └── price-service.js        # BTC ⇄ fiat (multi-currency, cached)
 │   ├── utils/
-│   │   ├── dom.js, format.js, icons.js, ui.js
+│   │   ├── html.js, icons.js, ui.js
 │   ├── components/
 │   │   ├── header.js, sidebar.js, tabbar.js, rail.js, lock.js
 │   │   ├── modal.js, toast.js, quick-add.js, tx-modal.js
 │   │   ├── journal-composer.js, budgets-modal.js, login-modal.js
-│   │   ├── transaction-form.js, category-manager.js
+│   │   ├── tx-row.js
 │   └── pages/
 │       ├── dashboard.js, transactions.js, journal.js, settings.js
 ├── tests/
@@ -160,6 +162,12 @@ store.subscribe("sync", (s) => {});
 
 ### Components
 
+Components extend `Component` and implement `template()`, which may return an
+HTML string (legacy) or VanJS DOM node(s) (preferred for new work). See
+`js/components/tabbar.js` for a VanJS reference.
+
+Legacy string template:
+
 ```js
 class MyComponent extends Component {
   template() { return "<div>...</div>"; }
@@ -168,10 +176,30 @@ class MyComponent extends Component {
 }
 ```
 
+VanJS view — `storeState()` mirrors a store path as a reactive state so the
+view updates in place instead of re-rendering the whole container:
+
+```js
+import van from "../vendor/van.js";
+const { div } = van.tags;
+
+class Counter extends Component {
+  beforeMount() { this.count = this.storeState("ui.count"); }
+  template() {
+    return div("Count: ", () => this.count.val);
+  }
+}
+```
+
+VanJS is vendored under `js/vendor/van.js` (MIT) and precached, so the UI layer
+works fully offline with no install or build step. Its `van.tags` build DOM
+nodes directly and escape text, which removes the raw-`innerHTML` injection
+class the string templates require `escapeHtml()` for.
+
 ## PWA / offline
 
 - `service-worker.js` precaches the full module graph (relative paths, so it works under a sub-path). Navigation uses the network when available and falls back to the cached `index.html` offline. App assets are cache-first within each release. The deploy script hashes published files into the worker cache name so a changed release replaces the old cache.
-- External resources (`nostr-tools` from a CDN, Google Fonts) are intentionally not cached by the SW. `nostr-tools` is required for signing/encryption, so offline authentication needs a cached/self-hosted copy.
+- External resources (`nostr-tools` from a CDN, Google Fonts) are intentionally not cached by the SW. `nostr-tools` is required for signing/encryption, so offline authentication needs a cached/self-hosted copy. VanJS is vendored under `js/vendor/` and precached, so the UI layer needs no network.
 - IndexedDB persists all local data across offline reloads.
 - PWA icons are generated with `npm run icons` (`scripts/generate-icons.mjs`, dependency-free PNG writer); `icon-192`/`icon-512` are precached.
 
@@ -211,6 +239,7 @@ They stub browser-only storage/encryption, so no build step or browser is requir
 ## Requirements
 
 - Modern browser with ES module support and IndexedDB.
+- No install or build step: VanJS is vendored in-repo (`js/vendor/van.js`).
 - PWA/offline: a secure context (HTTPS or localhost) for the service worker.
 - NIP-07 extension (Alby, nos2x) or an imported nsec to sync with Nostr.
 

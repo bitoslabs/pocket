@@ -2,14 +2,20 @@
  * Dock Component - ZapJournal (mobile / tablet navigation)
  * Replaces the legacy tab bar. Includes the centre FAB.
  *
+ * Reference VanJS component: `template()` returns DOM nodes and the active
+ * route is bound through `this.storeState(...)` so no manual re-render or
+ * innerHTML hydration is needed.
+ *
  * @module components/tabbar
  */
 
 import { Component } from '../core/component.js';
-import { store } from '../core/state.js';
 import { t } from '../core/i18n.js';
-import { Icons, hydrateIcons } from '../utils/icons.js';
+import { Icons } from '../utils/icons.js';
 import { openQuickAdd } from './quick-add.js';
+import van from '../vendor/van.js';
+
+const { a, button, span } = van.tags;
 
 const NAV = [
   { id: 'home', labelKey: 'nav.today', icon: 'home' },
@@ -19,35 +25,38 @@ const NAV = [
 ];
 
 export class Dock extends Component {
-  mounted() {
-    this.watchStore('ui.currentRoute', () => this.render());
+  beforeMount() {
+    this._route = this.storeState('ui.currentRoute');
   }
 
   template() {
-    const current = store.get('ui.currentRoute') || 'home';
-    const btn = (item) => `
-      <a class="dock-btn nav-link ${current === item.id ? 'on' : ''}"
-         href="#${item.id}" data-tab="${item.id}">
-        <span class="ic">${Icons[item.icon]}</span>${t(item.labelKey)}
-      </a>`;
+    const navLink = (item) =>
+      a(
+        {
+          class: () =>
+            `dock-btn nav-link ${(this._route.val || 'home') === item.id ? 'on' : ''}`,
+          href: `#${item.id}`,
+          'data-tab': item.id,
+        },
+        span({ class: 'ic', innerHTML: Icons[item.icon] }),
+        t(item.labelKey)
+      );
 
-    return `
-      ${btn(NAV[0])}
-      ${btn(NAV[1])}
-      <button class="fab" data-action="open-quick" aria-label="${t('nav.quickAdd')}">
-        <span class="ic">${Icons.plus}</span>
-      </button>
-      ${btn(NAV[2])}
-      ${btn(NAV[3])}
-    `;
-  }
-
-  bindEvents() {
-    this.addEventListener('[data-action="open-quick"]', 'click', () => openQuickAdd());
-  }
-
-  afterRender() {
-    hydrateIcons(this.container);
+    return [
+      navLink(NAV[0]),
+      navLink(NAV[1]),
+      button(
+        {
+          class: 'fab',
+          'data-action': 'open-quick',
+          'aria-label': t('nav.quickAdd'),
+          onclick: () => openQuickAdd(),
+        },
+        span({ class: 'ic', innerHTML: Icons.plus })
+      ),
+      navLink(NAV[2]),
+      navLink(NAV[3]),
+    ];
   }
 }
 

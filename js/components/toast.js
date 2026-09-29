@@ -1,32 +1,51 @@
 /**
  * Toast Component
  * Notification toast messages
- * 
+ *
+ * VanJS view: toasts are built with `van.tags`, so titles/messages are inserted
+ * as text nodes and are escaped automatically — no manual escaping needed.
+ *
  * @module components/toast
  */
 
 import { eventBus, Events } from '../core/event-bus.js';
 import { config } from '../config.js';
 import { t } from '../core/i18n.js';
+import van from '../vendor/van.js';
+
+const { div, span, button } = van.tags;
+
+const ICONS = {
+    success: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+      </svg>`,
+    error: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="15" y1="9" x2="9" y2="15"></line>
+        <line x1="9" y1="9" x2="15" y2="15"></line>
+      </svg>`,
+    warning: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>`,
+    info: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+      </svg>`,
+};
+
+const CLOSE_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>`;
 
 class ToastManager {
     constructor() {
-        this._container = null;
-        this._init();
-    }
-
-    /**
-     * Initialize toast container and event listener
-     * @private
-     */
-    _init() {
-        // Create container if it doesn't exist
-        if (!this._container) {
-            this._container = document.createElement('div');
-            this._container.className = 'toast-container';
-            this._container.setAttribute('aria-live', 'polite');
-            document.body.appendChild(this._container);
-        }
+        this._container = div({ class: 'toast-container', 'aria-live': 'polite' });
+        document.body.appendChild(this._container);
 
         // Listen for toast events
         eventBus.on(Events.TOAST_SHOW, (data) => {
@@ -43,30 +62,21 @@ class ToastManager {
      * @param {number} [options.duration] - Display duration in ms
      */
     show({ message, title = '', type = 'info', duration = config.ui.toastDuration }) {
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.setAttribute('role', 'alert');
-
-        toast.innerHTML = `
-      <span class="toast-icon">
-        ${this._getIcon(type)}
-      </span>
-      <div class="toast-content">
-        ${title ? `<div class="toast-title">${this._escape(title)}</div>` : ''}
-        <div class="toast-message">${this._escape(message)}</div>
-      </div>
-      <button class="toast-close btn-icon btn-ghost" aria-label="${t('common.close')}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
-    `;
-
-        // Close button handler
-        toast.querySelector('.toast-close').addEventListener('click', () => {
-            this._dismiss(toast);
-        });
+        const toast = div(
+            { class: `toast ${type}`, role: 'alert' },
+            span({ class: 'toast-icon', innerHTML: ICONS[type] || ICONS.info }),
+            div(
+                { class: 'toast-content' },
+                title ? div({ class: 'toast-title' }, title) : null,
+                div({ class: 'toast-message' }, message)
+            ),
+            button({
+                class: 'toast-close btn-icon btn-ghost',
+                'aria-label': t('common.close'),
+                innerHTML: CLOSE_ICON,
+                onclick: () => this._dismiss(toast),
+            })
+        );
 
         // Add to container
         this._container.appendChild(toast);
@@ -140,46 +150,6 @@ class ToastManager {
     dismissAll() {
         const toasts = this._container.querySelectorAll('.toast');
         toasts.forEach(toast => this._dismiss(toast));
-    }
-
-    /**
-     * Get icon SVG for toast type
-     * @private
-     */
-    _getIcon(type) {
-        const icons = {
-            success: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-      </svg>`,
-            error: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="15" y1="9" x2="9" y2="15"></line>
-        <line x1="9" y1="9" x2="15" y2="15"></line>
-      </svg>`,
-            warning: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-        <line x1="12" y1="9" x2="12" y2="13"></line>
-        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-      </svg>`,
-            info: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="12" y1="16" x2="12" y2="12"></line>
-        <line x1="12" y1="8" x2="12.01" y2="8"></line>
-      </svg>`
-        };
-        return icons[type] || icons.info;
-    }
-
-    /**
-     * Escape HTML
-     * @private
-     */
-    _escape(str) {
-        if (!str) return '';
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
     }
 }
 

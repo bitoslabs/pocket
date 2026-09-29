@@ -8,6 +8,7 @@
 import { eventBus, Events } from './core/event-bus.js';
 import { store } from './core/state.js';
 import { t } from './core/i18n.js';
+import { config } from './config.js';
 
 class Router {
     constructor() {
@@ -36,7 +37,7 @@ class Router {
         eventBus.on(Events.LANGUAGE_CHANGED, () => {
             const route = this._currentRoute?.route;
             const title = route?.titleKey ? t(route.titleKey) : route?.title;
-            if (title) document.title = `${title} | ZapJournal`;
+            if (title) document.title = `${title} | ${config.app.name}`;
         });
 
         // Handle initial route
@@ -199,7 +200,7 @@ class Router {
         // Check authentication if required
         if (matchedRoute?.auth && !store.get('isAuthenticated')) {
             eventBus.emit(Events.AUTH_ERROR, { message: 'Authentication required' });
-            this.navigate('login');
+            this.navigate('home');
             return;
         }
 
@@ -215,7 +216,7 @@ class Router {
             // Update page title
             const pageTitle = matchedRoute?.titleKey ? t(matchedRoute.titleKey) : matchedRoute?.title;
             if (pageTitle) {
-                document.title = `${pageTitle} | ZapJournal`;
+                document.title = `${pageTitle} | ${config.app.name}`;
             }
 
             // Render route component

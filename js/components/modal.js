@@ -94,7 +94,7 @@ class ModalManager {
      * Open modal
      * @param {Object} options - Modal options
      * @param {string} options.title - Modal title
-     * @param {string|HTMLElement} options.content - Modal body content
+     * @param {string|Node|Array<Node>} options.content - Modal body content
      * @param {Array} [options.actions] - Footer action buttons
      * @param {Function} [options.onClose] - Close callback
      */
@@ -111,13 +111,14 @@ class ModalManager {
         const closeBtn = this._modal.querySelector('.modal-close');
         if (closeBtn) closeBtn.setAttribute('aria-label', t('common.close'));
 
-        // Set content
+        // Set content — accept an HTML string (legacy) or VanJS node(s).
         const bodyEl = this._modal.querySelector('.modal-body');
         if (typeof content === 'string') {
             bodyEl.innerHTML = content;
-        } else if (content instanceof HTMLElement) {
-            bodyEl.innerHTML = '';
-            bodyEl.appendChild(content);
+        } else if (content instanceof Node) {
+            bodyEl.replaceChildren(content);
+        } else if (Array.isArray(content)) {
+            bodyEl.replaceChildren(...content);
         }
 
         // Set footer actions

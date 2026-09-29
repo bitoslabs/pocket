@@ -1,6 +1,9 @@
 /**
  * Home Page (Today) - greeting, balance, today's entry, budgets, activity
  *
+ * VanJS view: `template()` returns DOM nodes built with `van.tags`, so text is
+ * escaped automatically and no `hydrateIcons` pass is needed.
+ *
  * @module pages/dashboard
  */
 
@@ -11,12 +14,11 @@ import { budgetService } from '../services/budget-service.js';
 import { categoryService } from '../services/category-service.js';
 import { storageService } from '../services/storage-service.js';
 import { routeTo } from '../router.js';
-import { Icons, hydrateIcons } from '../utils/icons.js';
+import { Icons } from '../utils/icons.js';
 import {
   MOODS,
   allTimeBalance,
   categoryMeta,
-  escapeHtml,
   fiatLabel,
   fmtSats,
   fmtFull,
@@ -26,10 +28,13 @@ import {
   monthTotals,
   toBTC,
   toMs,
-  txRowHtml,
 } from '../utils/ui.js';
+import { txRow } from '../components/tx-row.js';
 import { openComposer } from '../components/journal-composer.js';
 import { openTxModal } from '../components/tx-modal.js';
+import van from '../vendor/van.js';
+
+const { b, button, div, h3, i, p, small, span } = van.tags;
 
 export class HomePage extends Component {
   mounted() {
@@ -55,12 +60,12 @@ export class HomePage extends Component {
 
     const progress = budgetService.getAllBudgetProgress();
     const topBudgets = [...progress]
-      .filter((p) => p.percentage > 0)
-      .sort((a, b) => b.percentage - a.percentage)
+      .filter((entry) => entry.percentage > 0)
+      .sort((a, b2) => b2.percentage - a.percentage)
       .slice(0, 3);
 
     const recent = [...transactions]
-      .sort((a, b) => toMs(b.created_at) - toMs(a.created_at))
+      .sort((a, b2) => toMs(b2.created_at) - toMs(a.created_at))
       .slice(0, 4);
 
     const linkedIds = new Set(entries.map((e) => e.linkedTransaction).filter(Boolean));
@@ -71,128 +76,169 @@ export class HomePage extends Component {
     const showLocalNotice =
       !authenticated && !storageService.getLocal('app_local_notice_dismissed', false);
 
-    return `
-      <div class="hi">${greeting()}, ${escapeHtml(helloName)} 👋</div>
-      <div class="hi-sub">${now.toLocaleDateString(locale(), {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-      })} · ${t('dashboard.privateCorner')}</div>
+    const dateStr = now.toLocaleDateString(locale(), {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    });
 
-      ${
-        showLocalNotice
-          ? `<div class="card local-notice">
-               <div class="card-head"><h3>${t('dashboard.localModeTitle')}</h3>
-                 <button class="btn btn-ghost btn-sm" data-action="dismiss-local">${t(
-                   'common.dismiss'
-                 )}</button>
-               </div>
-               <p class="muted-p" style="text-align:left;padding:0 0 12px">
-                 ${t('dashboard.localModeBody')}
-               </p>
-             </div>`
-          : ''
-      }
-
-      ${
-        authenticated
-          ? ''
-          : `<div class="card"><div class="card-head"><h3>${t('dashboard.connectTitle')}</h3></div>
-             <p class="muted-p" style="text-align:left;padding:0 0 12px">
-               ${t('dashboard.connectBody')}
-             </p>
-             <button class="btn btn-primary btn-block" data-action="connect">${t(
-               'dashboard.connectButton'
-             )}</button></div>`
-      }
-
-      <div class="balance">
-        <div class="bal-label">${t('dashboard.satoshiBalance')}</div>
-        <div class="bal-num">${fmtFull(balance)}<small>${t('common.sats')}</small></div>
-        ${
-          fiatLabel(balance)
-            ? `<div class="bal-conv">${fmtFull(balance)} ${t('common.sats')} ~ ${fiatLabel(
-                balance
-              )}</div>`
-            : ''
-        }
-        <div class="bal-btc">${toBTC(balance)}</div>
-        <div class="bal-row">
-          <div class="bal-cell in">
-            <span class="ic">${Icons.downLeft}</span>
-            <div>
-              <div class="bc-t">${t('dashboard.inMonth')}</div>
-              <div class="bc-v">${fmtSats(tin)}</div>
-              ${fiatLabel(tin) ? `<div class="bc-f">${fiatLabel(tin)}</div>` : ''}
-            </div>
-          </div>
-          <div class="bal-cell">
-            <span class="ic">${Icons.upRight}</span>
-            <div>
-              <div class="bc-t">${t('dashboard.outMonth')}</div>
-              <div class="bc-v">${fmtSats(tout)}</div>
-              ${fiatLabel(tout) ? `<div class="bc-f">${fiatLabel(tout)}</div>` : ''}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card ${todayEntry ? '' : 'prompt'}">
-        ${
-          todayEntry
-            ? this._todayEntryCard(todayEntry)
-            : `<h3>${t('dashboard.howWasToday')}</h3>
-               <p>${t('dashboard.journalWaiting')}</p>
-               <div class="mood-quick">
-                 ${MOODS.map(
-                   (m) =>
-                     `<button class="mq" data-action="new-mood" data-mood="${m.id}" title="${moodLabel(
-                       m
-                     )}">${m.emoji}</button>`
-                 ).join('')}
-               </div>`
-        }
-      </div>
-
-      ${
-        topBudgets.length
-          ? `<div class="card">
-               <div class="card-head"><h3>${t('dashboard.budgetsThisMonth')}</h3>
-                 <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" data-action="go-money">${t(
-                   'dashboard.moneyLink'
-                 )}</button>
-               </div>
-               ${topBudgets.map((b) => this._budgetRow(b)).join('')}
-             </div>`
-          : ''
-      }
-
-      <div class="card">
-        <div class="card-head"><h3>${t('dashboard.recentActivity')}</h3>
-          <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" data-action="go-money">${t(
-            'dashboard.viewAll'
-          )}</button>
-        </div>
-        ${recent.map((tx) => txRowHtml(tx, linkedIds)).join('')}
-      </div>
-    `;
+    const frag = document.createDocumentFragment();
+    van.add(
+      frag,
+      div({ class: 'hi' }, `${greeting()}, ${helloName} 👋`),
+      div({ class: 'hi-sub' }, `${dateStr} · ${t('dashboard.privateCorner')}`),
+      showLocalNotice ? this._localNotice() : null,
+      authenticated ? null : this._connectCard(),
+      this._balanceBlock(balance, tin, tout),
+      this._todayCard(todayEntry),
+      topBudgets.length ? this._budgetsCard(topBudgets) : null,
+      this._recentCard(recent, linkedIds)
+    );
+    return frag;
   }
 
-  _todayEntryCard(entry) {
-    const mood = moodById(entry.mood);
-    return `
-      <div class="card-head" style="margin-bottom:8px">
-        <h3>${t('dashboard.todaysEntry')}</h3>
-        <span class="priv-pill">${Icons.eyeOff} ${t('dashboard.private')}</span>
-      </div>
-      ${mood ? `<div class="jmood"><span class="je">${mood.emoji}</span>${mood.label}</div>` : ''}
-      <p class="jtext" style="margin:8px 0 0">${escapeHtml(
-        entry.text.slice(0, 180)
-      )}${entry.text.length > 180 ? '…' : ''}</p>
-      <button class="btn btn-ghost" style="margin-top:12px" data-action="go-journal">${t(
-        'dashboard.readInJournal'
-      )}</button>
-    `;
+  _localNotice() {
+    return div(
+      { class: 'card local-notice' },
+      div(
+        { class: 'card-head' },
+        h3(t('dashboard.localModeTitle')),
+        button(
+          { class: 'btn btn-ghost btn-sm', 'data-action': 'dismiss-local' },
+          t('common.dismiss')
+        )
+      ),
+      p(
+        { class: 'muted-p', style: 'text-align:left;padding:0 0 12px' },
+        t('dashboard.localModeBody')
+      )
+    );
+  }
+
+  _connectCard() {
+    return div(
+      { class: 'card' },
+      div({ class: 'card-head' }, h3(t('dashboard.connectTitle'))),
+      p(
+        { class: 'muted-p', style: 'text-align:left;padding:0 0 12px' },
+        t('dashboard.connectBody')
+      ),
+      button(
+        { class: 'btn btn-primary btn-block', 'data-action': 'connect' },
+        t('dashboard.connectButton')
+      )
+    );
+  }
+
+  _balanceBlock(balance, tin, tout) {
+    const conv = fiatLabel(balance);
+    return div(
+      { class: 'balance' },
+      div({ class: 'bal-label' }, t('dashboard.satoshiBalance')),
+      div({ class: 'bal-num' }, fmtFull(balance), small(t('common.sats'))),
+      conv ? div({ class: 'bal-conv' }, `${fmtFull(balance)} ${t('common.sats')} ~ ${conv}`) : null,
+      div({ class: 'bal-btc' }, toBTC(balance)),
+      div(
+        { class: 'bal-row' },
+        this._balanceCell('in', 'downLeft', t('dashboard.inMonth'), fmtSats(tin), fiatLabel(tin)),
+        this._balanceCell(null, 'upRight', t('dashboard.outMonth'), fmtSats(tout), fiatLabel(tout))
+      )
+    );
+  }
+
+  _balanceCell(modifier, icon, label, value, fiat) {
+    return div(
+      { class: `bal-cell${modifier ? ' ' + modifier : ''}` },
+      span({ class: 'ic', innerHTML: Icons[icon] }),
+      div(
+        {},
+        div({ class: 'bc-t' }, label),
+        div({ class: 'bc-v' }, value),
+        fiat ? div({ class: 'bc-f' }, fiat) : null
+      )
+    );
+  }
+
+  _todayCard(todayEntry) {
+    const children = [];
+    if (todayEntry) {
+      const mood = moodById(todayEntry.mood);
+      children.push(
+        div(
+          { class: 'card-head', style: 'margin-bottom:8px' },
+          h3(t('dashboard.todaysEntry')),
+          span({ class: 'priv-pill' }, span({ innerHTML: Icons.eyeOff }), ` ${t('dashboard.private')}`)
+        )
+      );
+      if (mood) {
+        children.push(div({ class: 'jmood' }, span({ class: 'je' }, mood.emoji), mood.label));
+      }
+      children.push(
+        p(
+          { class: 'jtext', style: 'margin:8px 0 0' },
+          `${todayEntry.text.slice(0, 180)}${todayEntry.text.length > 180 ? '…' : ''}`
+        )
+      );
+      children.push(
+        button(
+          { class: 'btn btn-ghost', style: 'margin-top:12px', 'data-action': 'go-journal' },
+          t('dashboard.readInJournal')
+        )
+      );
+    } else {
+      children.push(h3(t('dashboard.howWasToday')));
+      children.push(p(t('dashboard.journalWaiting')));
+      children.push(
+        div(
+          { class: 'mood-quick' },
+          MOODS.map((m) =>
+            button(
+              { class: 'mq', 'data-action': 'new-mood', 'data-mood': m.id, title: moodLabel(m) },
+              m.emoji
+            )
+          )
+        )
+      );
+    }
+    return div({ class: `card${todayEntry ? '' : ' prompt'}` }, children);
+  }
+
+  _budgetsCard(topBudgets) {
+    return div(
+      { class: 'card' },
+      div(
+        { class: 'card-head' },
+        h3(t('dashboard.budgetsThisMonth')),
+        button(
+          {
+            class: 'btn btn-ghost',
+            style: 'padding:6px 12px;font-size:12px',
+            'data-action': 'go-money',
+          },
+          t('dashboard.moneyLink')
+        )
+      ),
+      topBudgets.map((progress) => this._budgetRow(progress))
+    );
+  }
+
+  _recentCard(recent, linkedIds) {
+    return div(
+      { class: 'card' },
+      div(
+        { class: 'card-head' },
+        h3(t('dashboard.recentActivity')),
+        button(
+          {
+            class: 'btn btn-ghost',
+            style: 'padding:6px 12px;font-size:12px',
+            'data-action': 'go-money',
+          },
+          t('dashboard.viewAll')
+        )
+      ),
+      recent.map((tx) => txRow(tx, linkedIds))
+    );
   }
 
   _budgetRow(progress) {
@@ -207,11 +253,18 @@ export class HomePage extends Component {
         ? 'var(--zap)'
         : meta.color;
     const cls = status === 'danger' ? 'over' : status === 'warning' ? 'warn' : '';
-    return `<div class="bud-row"><div class="bud-info">
-      <div class="bud-top"><span>${cat?.name || meta.label}</span>
-        <b class="${cls}">${fmtSats(spent)} / ${fmtSats(budget.amount)}</b></div>
-      <div class="btrack"><i class="bfill" style="width:${pct}%;background:${col}"></i></div>
-    </div></div>`;
+    return div(
+      { class: 'bud-row' },
+      div(
+        { class: 'bud-info' },
+        div(
+          { class: 'bud-top' },
+          span(cat?.name || meta.label),
+          b({ class: cls }, `${fmtSats(spent)} / ${fmtSats(budget.amount)}`)
+        ),
+        div({ class: 'btrack' }, i({ class: 'bfill', style: `width:${pct}%;background:${col}` }))
+      )
+    );
   }
 
   bindEvents() {
@@ -235,14 +288,10 @@ export class HomePage extends Component {
       } else if (action === 'new-mood') {
         openComposer({ mood: el.dataset.mood || null });
       } else if (action === 'edit-tx') {
-        const tx = (store.get('transactions') || []).find((t) => t.id === el.dataset.id);
+        const tx = (store.get('transactions') || []).find((x) => x.id === el.dataset.id);
         if (tx) openTxModal({ tx });
       }
     });
-  }
-
-  afterRender() {
-    hydrateIcons(this.container);
   }
 }
 

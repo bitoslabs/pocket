@@ -1,6 +1,8 @@
 /**
  * Quick Add - action sheet (journal entry / log money)
  *
+ * VanJS view: rows are built with `van.tags` and use inline click handlers.
+ *
  * @module components/quick-add
  */
 
@@ -9,33 +11,58 @@ import { t } from '../core/i18n.js';
 import { Icons } from '../utils/icons.js';
 import { openComposer } from './journal-composer.js';
 import { openTxModal } from './tx-modal.js';
+import van from '../vendor/van.js';
+
+const { b, button, div, span } = van.tags;
+
+const ROWS = [
+  {
+    choice: 'compose',
+    icon: 'edit',
+    bg: 'var(--accent-soft)',
+    fg: 'var(--accent-2)',
+    titleKey: 'quickAdd.journalTitle',
+    subKey: 'quickAdd.journalSub',
+  },
+  {
+    choice: 'out',
+    icon: 'upRight',
+    bg: 'var(--out-soft)',
+    fg: 'var(--out)',
+    titleKey: 'quickAdd.expenseTitle',
+    subKey: 'quickAdd.expenseSub',
+  },
+  {
+    choice: 'in',
+    icon: 'downLeft',
+    bg: 'var(--in-soft)',
+    fg: 'var(--in)',
+    titleKey: 'quickAdd.incomeTitle',
+    subKey: 'quickAdd.incomeSub',
+  },
+];
 
 export function openQuickAdd() {
-  const content = document.createElement('div');
-  content.style.marginTop = '8px';
-  content.innerHTML = `
-    <button class="qa-row" data-choice="compose">
-      <span class="qa-ic ic" style="background:var(--accent-soft);color:var(--accent-2)">${Icons.edit}</span>
-      <span><b>${t('quickAdd.journalTitle')}</b><span>${t('quickAdd.journalSub')}</span></span>
-    </button>
-    <button class="qa-row" data-choice="out">
-      <span class="qa-ic ic" style="background:var(--out-soft);color:var(--out)">${Icons.upRight}</span>
-      <span><b>${t('quickAdd.expenseTitle')}</b><span>${t('quickAdd.expenseSub')}</span></span>
-    </button>
-    <button class="qa-row" data-choice="in">
-      <span class="qa-ic ic" style="background:var(--in-soft);color:var(--in)">${Icons.downLeft}</span>
-      <span><b>${t('quickAdd.incomeTitle')}</b><span>${t('quickAdd.incomeSub')}</span></span>
-    </button>
-  `;
-
-  content.addEventListener('click', (e) => {
-    const row = e.target.closest('[data-choice]');
-    if (!row) return;
-    const choice = row.dataset.choice;
+  const choose = (choice) => {
     modal.close();
     if (choice === 'compose') openComposer();
     else openTxModal({ dir: choice });
-  });
+  };
+
+  const content = div(
+    { style: 'margin-top:8px' },
+    ROWS.map((row) =>
+      button(
+        { class: 'qa-row', 'data-choice': row.choice, onclick: () => choose(row.choice) },
+        span({
+          class: 'qa-ic ic',
+          style: `background:${row.bg};color:${row.fg}`,
+          innerHTML: Icons[row.icon],
+        }),
+        span(b(t(row.titleKey)), span(t(row.subKey)))
+      )
+    )
+  );
 
   modal.open({ title: t('quickAdd.title'), content });
 }

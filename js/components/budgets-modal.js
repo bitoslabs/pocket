@@ -1,6 +1,9 @@
 /**
  * Budgets Modal - set monthly budgets per category
  *
+ * VanJS view: rows are built with `van.tags`; the save handler still reads the
+ * inputs by `data-cat` from the mounted content node.
+ *
  * @module components/budgets-modal
  */
 
@@ -10,28 +13,41 @@ import { budgetService } from '../services/budget-service.js';
 import { categoryService } from '../services/category-service.js';
 import { Icons } from '../utils/icons.js';
 import { categoryMeta, toast } from '../utils/ui.js';
+import van from '../vendor/van.js';
+
+const { div, input, label, span } = van.tags;
 
 export function openBudgetsModal({ onSaved = null } = {}) {
   const cats = categoryService.getCategories('expense').filter((c) => c.id !== 'uncategorized');
   const existing = budgetService.getBudgets({ period: 'monthly' });
   const byCat = new Map(existing.map((b) => [b.categoryId, b]));
 
-  const content = document.createElement('div');
-  content.style.marginTop = '6px';
-  content.innerHTML = cats
-    .map((c) => {
+  const content = div(
+    { style: 'margin-top:6px' },
+    cats.map((c) => {
       const meta = categoryMeta(c.id);
       const b = byCat.get(c.id);
-      return `<div class="bud-edit-row">
-        <span class="be-ic" style="background:${meta.color}1F">
-          <span class="ic" style="color:${meta.color}">${Icons[meta.icon] || Icons.file}</span>
-        </span>
-        <label>${c.name || meta.label}</label>
-        <input type="number" min="0" inputmode="numeric" data-cat="${c.id}"
-          value="${b ? Math.round(b.amount) : 0}" />
-      </div>`;
+      return div(
+        { class: 'bud-edit-row' },
+        span(
+          { class: 'be-ic', style: `background:${meta.color}1F` },
+          span({
+            class: 'ic',
+            style: `color:${meta.color}`,
+            innerHTML: Icons[meta.icon] || Icons.file,
+          })
+        ),
+        label(c.name || meta.label),
+        input({
+          type: 'number',
+          min: '0',
+          inputmode: 'numeric',
+          'data-cat': c.id,
+          value: b ? Math.round(b.amount) : 0,
+        })
+      );
     })
-    .join('');
+  );
 
   const actions = [
     {

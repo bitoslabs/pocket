@@ -17,10 +17,13 @@
   --text-2: #b9b0cc;
   --muted: #7d7396;
 
+  /* Base accent is overridden by JS (one property only).
+     Variants are derived here so they follow `--accent` automatically and
+     can be re-tuned per theme without JS touching them. */
   --accent: #8b5cf6;
-  --accent-2: #a78bfa;
-  --accent-deep: #6d28d9;
-  --accent-soft: rgba(139, 92, 246, 0.14);
+  --accent-2: color-mix(in srgb, var(--accent) 82%, #fff);
+  --accent-deep: color-mix(in srgb, var(--accent) 70%, #000);
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
 
   --zap: #ffc24b;
   --zap-soft: rgba(255, 194, 75, 0.13);
@@ -181,9 +184,9 @@
   --color-primary: var(--accent);
   --color-primary-light: var(--accent-2);
   --color-primary-dark: var(--accent-deep);
-  --color-primary-alpha-10: rgba(139, 92, 246, 0.1);
-  --color-primary-alpha-20: rgba(139, 92, 246, 0.2);
-  --color-primary-alpha-50: rgba(139, 92, 246, 0.5);
+  --color-primary-alpha-10: color-mix(in srgb, var(--accent) 10%, transparent);
+  --color-primary-alpha-20: color-mix(in srgb, var(--accent) 20%, transparent);
+  --color-primary-alpha-50: color-mix(in srgb, var(--accent) 50%, transparent);
 
   --color-bg-primary: var(--bg);
   --color-bg-secondary: var(--surface);
@@ -240,6 +243,10 @@ html[data-lang="th"] {
   --text: #1b1630;
   --text-2: #4b4265;
   --muted: #857c9e;
+
+  /* Deepen the light accent variant: on pale surfaces the dark-theme
+     `--accent-2` (a tint of the accent) fails contrast for links/badges. */
+  --accent-2: color-mix(in srgb, var(--accent) 76%, #000);
 
   --zap-soft: rgba(245, 158, 11, 0.16);
   --in-soft: rgba(34, 197, 94, 0.14);

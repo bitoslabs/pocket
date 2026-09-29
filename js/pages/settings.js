@@ -498,10 +498,10 @@ export class ProfilePage extends Component {
         loginModal.show();
       } else if (action === 'set-theme') {
         setTheme(el.dataset.theme);
-        this.render();
+        this._syncAppearance();
       } else if (action === 'set-accent') {
         setAccent(el.dataset.accent);
-        this.render();
+        this._syncAppearance();
       } else if (action === 'set-language') {
         setLanguage(el.dataset.lang);
       } else if (action === 'toggle-fiat') {
@@ -580,15 +580,7 @@ export class ProfilePage extends Component {
     this.addEventListener(this.container, 'input', (e) => {
       if (!e.target || e.target.id !== 'accentPicker') return;
       setAccent(e.target.value);
-      const accent = getAccent();
-      const label = this.container.querySelector('.bud-top b');
-      if (label) {
-        label.textContent = accent;
-        label.style.color = accent;
-      }
-      this.container
-        .querySelectorAll('.swatch')
-        .forEach((s) => s.classList.toggle('on', s.dataset.accent === accent));
+      this._syncAppearance();
     });
 
     // Currency + manual rate (commit on change)
@@ -599,6 +591,29 @@ export class ProfilePage extends Component {
         priceService.setManualRate(e.target.value);
       }
     });
+  }
+
+  /** Reflect the current theme/accent in the appearance card without a
+   *  full re-render (avoids the layout flash on every toggle). */
+  _syncAppearance() {
+    const theme = getTheme();
+    const accent = getAccent();
+
+    this.$$('[data-action="set-theme"]').forEach((b) =>
+      b.classList.toggle('on', b.dataset.theme === theme)
+    );
+    this.$$('.swatch').forEach((s) =>
+      s.classList.toggle('on', s.dataset.accent === accent)
+    );
+
+    const label = this.container.querySelector('.bud-top b');
+    if (label) {
+      label.textContent = accent;
+      label.style.color = accent;
+    }
+
+    const picker = this.container.querySelector('#accentPicker');
+    if (picker) picker.value = accent.toLowerCase();
   }
 
   _openEditProfile() {

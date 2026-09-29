@@ -296,6 +296,23 @@ button svg {
   border: 0;
 }
 
+/* ==================== Theme switch cross-fade ====================
+   JS adds `.theme-anim` to <html> for a moment when the user toggles the
+   theme or accent, so colours ease instead of snapping. Removed right after,
+   keeping normal component transitions untouched. */
+html.theme-anim,
+html.theme-anim *,
+html.theme-anim *::before,
+html.theme-anim *::after {
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease,
+    fill 220ms ease,
+    stroke 220ms ease,
+    box-shadow 220ms ease !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

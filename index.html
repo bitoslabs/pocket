@@ -52,11 +52,31 @@
           document.documentElement.setAttribute("lang", lang);
           document.documentElement.setAttribute("data-lang", lang);
         } catch (e) {}
+        var theme = "dark";
         try {
           var raw = localStorage.getItem("app_theme");
           var t = raw ? raw.replace(/"/g, "") : null;
-          if (t === "light" || t === "dark") {
-            document.documentElement.setAttribute("data-theme", t);
+          if (t === "light" || t === "dark") theme = t;
+        } catch (e) {}
+        document.documentElement.setAttribute("data-theme", theme);
+        // Keep the browser chrome in sync before the app boots.
+        var meta = document.getElementById("themeColorMeta");
+        if (meta) {
+          meta.setAttribute(
+            "content",
+            theme === "light" ? "#F5F3FB" : "#0B0912"
+          );
+        }
+        // Apply the saved accent now so the derived tokens (accent-2/deep/soft)
+        // resolve from the right base on the very first paint — no colour flash.
+        try {
+          var rawA = localStorage.getItem("app_accent");
+          var a = rawA ? rawA.replace(/"/g, "") : null;
+          if (a && /^#?[0-9a-fA-F]{6}$/.test(a)) {
+            document.documentElement.style.setProperty(
+              "--accent",
+              a.charAt(0) === "#" ? a : "#" + a
+            );
           }
         } catch (e) {}
       })();

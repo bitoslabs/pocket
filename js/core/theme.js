@@ -63,51 +63,67 @@ const mix = (hex, target, amount) => {
 export const lighten = (hex, amount = 0.18) => mix(hex, 255, amount);
 export const darken = (hex, amount = 0.28) => mix(hex, 0, amount);
 
+/** Browser chrome colour per theme (must match index.html's boot script). */
+export const THEME_COLORS = { dark: '#0B0912', light: '#F5F3FB' };
+
 let _theme = 'dark';
 let _accent = DEFAULT_ACCENT;
+let _animTimer = 0;
 
-/** Apply theme + accent to the document (no persistence). */
+/** Briefly enable the global colour cross-fade (see base.css). */
+function flashTransition() {
+  if (
+    typeof window === 'undefined' ||
+    !window.matchMedia ||
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
+    return;
+  }
+  const root = document.documentElement;
+  root.classList.add('theme-anim');
+  // Force a style flush so the transition is already part of the element's
+  // "before-change" style. Without this, WebKit/Safari skips the transition
+  // when the class and the value change land in the same frame, which made
+  // plain dividers (`background: var(--border-soft)`) snap/flash while
+  // elements that declare their own `transition` eased smoothly.
+  void root.offsetHeight;
+  clearTimeout(_animTimer);
+  _animTimer = window.setTimeout(() => root.classList.remove('theme-anim'), 260);
+}
+
+/** Apply theme + accent to the document (no persistence).
+ *  Only `--accent` is set inline; the derived variants (`--accent-2`,
+ *  `--accent-deep`, `--accent-soft`, legacy aliases) come from CSS
+ *  `color-mix()` so light/dark can tune them independently. */
 export function apply(theme = _theme, accent = _accent) {
   _theme = theme === 'light' ? 'light' : 'dark';
   _accent = normalizeHex(accent);
 
   const root = document.documentElement;
   root.setAttribute('data-theme', _theme);
-
-  const { r, g, b } = hexToRgb(_accent);
-  const soft = `rgba(${r}, ${g}, ${b}, 0.14)`;
-  const deep = darken(_accent, 0.3);
-  const light = lighten(_accent, 0.18);
-
   root.style.setProperty('--accent', _accent);
-  root.style.setProperty('--accent-2', light);
-  root.style.setProperty('--accent-deep', deep);
-  root.style.setProperty('--accent-soft', soft);
-
-  // Legacy aliases used by older components
-  root.style.setProperty('--color-primary', _accent);
-  root.style.setProperty('--color-primary-light', light);
-  root.style.setProperty('--color-primary-dark', deep);
-  root.style.setProperty('--color-primary-alpha-10', `rgba(${r}, ${g}, ${b}, 0.1)`);
-  root.style.setProperty('--color-primary-alpha-20', `rgba(${r}, ${g}, ${b}, 0.2)`);
-  root.style.setProperty('--color-primary-alpha-50', `rgba(${r}, ${g}, ${b}, 0.5)`);
-  root.style.setProperty('--color-tint', _accent);
 
   store.set('theme', _theme);
   store.set('accent', _accent);
 
   // Keep the browser chrome in sync
-  const meta = document.getElementById('themeColorMeta') || document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', _theme === 'light' ? '#F5F3FB' : '#0B0912');
+  const meta =
+    document.getElementById('themeColorMeta') ||
+    document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', THEME_COLORS[_theme]);
 }
 
 export function setTheme(theme) {
-  apply(theme, _accent);
+  const next = theme === 'light' ? 'light' : 'dark';
+  if (next !== _theme) flashTransition();
+  apply(next, _accent);
   storageService.setLocal(THEME_KEY, _theme);
 }
 
 export function setAccent(accent) {
-  apply(_theme, accent);
+  const next = normalizeHex(accent);
+  if (next !== _accent) flashTransition();
+  apply(_theme, next);
   storageService.setLocal(ACCENT_KEY, _accent);
 }
 

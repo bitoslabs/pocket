@@ -364,9 +364,11 @@ class ZapService {
         this._validateManualTransaction(transaction);
 
         try {
-            // Update in state and storage
-            transactions[index] = transaction;
-            store.set('transactions', [...transactions]);
+            // Update in state and storage (state is frozen, so build a new array)
+            store.set(
+                'transactions',
+                transactions.map(t => t.id === transactionId ? transaction : t)
+            );
             await storageService.put('transactions', transaction);
             await outbox.enqueue({
                 entity: 'transaction',
@@ -406,9 +408,11 @@ class ZapService {
             // Remove from storage
             await storageService.delete('transactions', transactionId);
 
-            // Remove from state
-            transactions.splice(index, 1);
-            store.set('transactions', [...transactions]);
+            // Remove from state (state is frozen, so build a new array)
+            store.set(
+                'transactions',
+                transactions.filter(t => t.id !== transactionId)
+            );
             await outbox.enqueue({
                 entity: 'transaction',
                 entityId: transactionId,

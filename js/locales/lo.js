@@ -69,6 +69,8 @@ export default {
     synced: 'ຊິງແລ້ວ',
     tapToSync: 'ແຕະເພື່ອຊິງດຽວນີ້',
     syncStatus: 'ສະຖານະການຊິງແບບເກັບໃນເຄື່ອງກ່ອນ',
+    themeLight: 'ປ່ຽນເປັນໂໝດແຈ້ງ',
+    themeDark: 'ປ່ຽນເປັນໂໝດມືດ',
   },
 
   dashboard: {

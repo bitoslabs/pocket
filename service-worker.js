@@ -42,6 +42,7 @@ const STATIC_ASSETS = [
     'js/services/budget-service.js',
     'js/services/recurring-service.js',
     'js/services/price-service.js',
+    'js/services/entry-prefs.js',
     'js/services/outbox.js',
     'js/services/sync-service.js',
     'js/utils/icons.js',

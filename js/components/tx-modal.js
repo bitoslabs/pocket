@@ -9,10 +9,11 @@
  */
 
 import { modal } from './modal.js';
-import { t } from '../core/i18n.js';
+import { t, categoryLabel } from '../core/i18n.js';
 import { zapService } from '../services/zap-service.js';
 import { categoryService } from '../services/category-service.js';
 import { priceService } from '../services/price-service.js';
+import { entryPrefs } from '../services/entry-prefs.js';
 import { Icons } from '../utils/icons.js';
 import { categoryMeta, fmtSats, playFX, toast } from '../utils/ui.js';
 import van from '../vendor/van.js';
@@ -33,8 +34,8 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
   const currency = priceService.currency;
 
   const dirState = van.state(tx ? TYPE_TO_DIR[tx.type] || 'out' : dir);
-  const catState = van.state(tx?.category || null);
-  const unitState = van.state('sats');
+  const catState = van.state(tx?.category || entryPrefs.lastCategory(dir));
+  const unitState = van.state(tx || !fiatOn ? 'sats' : entryPrefs.lastUnit());
   const previewState = van.state('');
 
   const catsFor = (d) => categoryService.getCategories(DIR_TO_TYPE[d]);
@@ -91,6 +92,7 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
           : priceService.fiatToSats(v);
     }
     unitState.val = next;
+    entryPrefs.setUnit(next);
     renderFiatPreview();
   };
 
@@ -102,7 +104,7 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
         class: () => (dirState.val === d ? (d === 'out' ? 'on-out' : 'on-in') : ''),
         onclick: () => {
           dirState.val = d;
-          catState.val = null;
+          catState.val = entryPrefs.lastCategory(d);
         },
       },
       span({ class: 'ic', innerHTML: Icons[icon] }),
@@ -132,28 +134,32 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
       )
     : span(t('common.sats'));
 
+  const currentCat = () => {
+    const cats = catsFor(dirState.val);
+    const sel = catState.val;
+    return sel && cats.some((c) => c.id === sel) ? sel : cats[0]?.id || 'other';
+  };
+
   const catsEl = div({ class: 'cat-chips', id: 'txCats' });
   van.derive(() => {
-    const d = dirState.val;
-    const cats = catsFor(d);
-    let sel = catState.val;
-    if (!sel || !cats.some((c) => c.id === sel)) {
-      sel = cats[0]?.id || 'other';
-      catState.val = sel;
-    }
+    const cats = catsFor(dirState.val);
+    const sel = currentCat();
     catsEl.replaceChildren();
     van.add(
       catsEl,
       cats.map((c) => {
         const meta = categoryMeta(c.id);
+        const on = sel === c.id;
         return button(
           {
             type: 'button',
-            class: `cat-chip ${sel === c.id ? 'on' : ''}`,
+            class: `cat-chip ${on ? 'on' : ''}`,
             style: `--cc:${meta.color}`,
             'data-cat': c.id,
+            'aria-pressed': String(on),
             onclick: () => {
               catState.val = c.id;
+              entryPrefs.setCategory(dirState.val, c.id);
             },
           },
           span({
@@ -161,7 +167,7 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
             style: `color:${meta.color}`,
             innerHTML: Icons[meta.icon] || Icons.file,
           }),
-          c.name || meta.label
+          categoryLabel(c.id, c.name || meta.label)
         );
       })
     );
@@ -206,7 +212,7 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
       }
       const note = noteInput.value.trim();
       const type = DIR_TO_TYPE[dirState.val];
-      const cat = catState.val;
+      const cat = currentCat();
 
       // Snapshot the fiat value at the time of entry (when shown)
       let fiatAmount;

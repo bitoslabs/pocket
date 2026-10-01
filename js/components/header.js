@@ -13,6 +13,7 @@ import { Component } from '../core/component.js';
 import { store } from '../core/state.js';
 import { t } from '../core/i18n.js';
 import { Icons } from '../utils/icons.js';
+import { setTheme } from '../core/theme.js';
 import { router } from '../router.js';
 import { lock } from './lock.js';
 import van from '../vendor/van.js';
@@ -25,6 +26,7 @@ export class Header extends Component {
   beforeMount() {
     this._searchOpen = van.state(false);
     this._query = this.storeState('ui.query');
+    this._theme = this.storeState('theme');
     this._sync = this.storeState('sync');
     this._authed = this.storeState('isAuthenticated');
     this._appLock = this.storeState('appLock');
@@ -191,9 +193,26 @@ export class Header extends Component {
       )
     );
 
+    const themeToggle = button(
+      {
+        class: 'icon-btn theme-toggle',
+        id: 'themeToggle',
+        'aria-label': () =>
+          this._theme.val === 'light' ? t('header.themeDark') : t('header.themeLight'),
+        title: () =>
+          this._theme.val === 'light' ? t('header.themeDark') : t('header.themeLight'),
+        onclick: () => setTheme(this._theme.val === 'light' ? 'dark' : 'light'),
+      },
+      span({
+        class: 'ic',
+        innerHTML: () => (this._theme.val === 'light' ? Icons.Moon : Icons.Sun),
+      })
+    );
+
     const topActions = div(
       { class: 'top-actions' },
       () => this._chipNode(),
+      themeToggle,
       button(
         {
           class: 'icon-btn search-toggle',

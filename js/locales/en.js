@@ -72,6 +72,8 @@ export default {
     synced: 'Synced',
     tapToSync: 'Tap to sync now',
     syncStatus: 'Local-first sync status',
+    themeLight: 'Switch to light mode',
+    themeDark: 'Switch to dark mode',
   },
 
   dashboard: {

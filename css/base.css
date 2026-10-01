@@ -45,16 +45,13 @@ body.lock {
   overflow: hidden;
 }
 
-/* Ambient gradient background */
+/* Ambient background */
 .bg {
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background:
-    radial-gradient(700px 420px at 15% -5%, var(--wash), transparent 60%),
-    radial-gradient(600px 400px at 92% 8%, var(--zap-soft), transparent 60%),
-    var(--bg);
+  background: var(--bg);
 }
 
 /* ==================== Typography ==================== */

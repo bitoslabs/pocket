@@ -69,6 +69,8 @@ export default {
     synced: 'ซิงก์แล้ว',
     tapToSync: 'แตะเพื่อซิงก์ทันที',
     syncStatus: 'สถานะการซิงก์แบบเก็บในเครื่องก่อน',
+    themeLight: 'เปลี่ยนเป็นโหมดสว่าง',
+    themeDark: 'เปลี่ยนเป็นโหมดมืด',
   },
 
   dashboard: {

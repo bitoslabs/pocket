@@ -8,7 +8,7 @@
  */
 
 import { modal } from './modal.js';
-import { t } from '../core/i18n.js';
+import { t, categoryLabel } from '../core/i18n.js';
 import { budgetService } from '../services/budget-service.js';
 import { categoryService } from '../services/category-service.js';
 import { Icons } from '../utils/icons.js';
@@ -37,7 +37,7 @@ export function openBudgetsModal({ onSaved = null } = {}) {
             innerHTML: Icons[meta.icon] || Icons.file,
           })
         ),
-        label(c.name || meta.label),
+        label(categoryLabel(c.id, c.name || meta.label)),
         input({
           type: 'number',
           min: '0',

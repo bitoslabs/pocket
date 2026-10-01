@@ -1678,7 +1678,13 @@
 .cat-chip.on {
   border-color: var(--cc);
   color: var(--cc);
-  background: color-mix(in srgb, var(--cc) 14%, transparent);
+  background: color-mix(in srgb, var(--cc) 20%, var(--surface-2));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cc) 38%, transparent);
+  font-weight: 700;
+}
+.cat-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .note-input {
   width: 100%;

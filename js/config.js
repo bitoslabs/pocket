@@ -27,6 +27,7 @@ export const config = {
     relays: {
         default: [
             'wss://nostr-01.yakihonne.com',
+            'wss://relay.bitos.space',
             'wss://relay.damus.io',
             'wss://nos.lol',
         ],

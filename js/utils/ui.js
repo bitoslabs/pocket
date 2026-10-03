@@ -8,6 +8,8 @@
 import { eventBus, Events } from '../core/event-bus.js';
 import { t, locale } from '../core/i18n.js';
 import { priceService } from '../services/price-service.js';
+import { categoryService } from '../services/category-service.js';
+import { Icons } from './icons.js';
 
 /* ==================== Time ==================== */
 
@@ -120,10 +122,22 @@ const CATEGORY_META = {
 };
 
 export function categoryMeta(id) {
-  const meta = CATEGORY_META[id] || { label: id || 'Other', color: '#7D7396', icon: 'file' };
+  const base = CATEGORY_META[id];
+  const custom = base ? null : categoryService.getCategory(id);
+  const emoji = !base && custom?.icon && !Icons[custom.icon] ? custom.icon : '';
+  const meta = base || {
+    label: custom?.name || id || 'Other',
+    color: custom?.color || '#7D7396',
+    icon: !emoji && custom?.icon && Icons[custom.icon] ? custom.icon : 'file',
+  };
   const key = `categories.${id}`;
   const label = t(key);
-  return { ...meta, label: label === key ? meta.label : label };
+  return { ...meta, label: label === key ? meta.label : label, emoji };
+}
+
+/** Category icon markup: custom emoji, else the SVG icon, else the file icon. */
+export function categoryIconHtml(meta) {
+  return meta.emoji || Icons[meta.icon] || Icons.file;
 }
 
 /* ==================== Moods ==================== */

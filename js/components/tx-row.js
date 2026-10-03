@@ -10,8 +10,7 @@
 import { t } from '../core/i18n.js';
 import { store } from '../core/state.js';
 import { priceService } from '../services/price-service.js';
-import { Icons } from '../utils/icons.js';
-import { amountOf, categoryMeta, fmtSats, fmtTime, isIncome } from '../utils/ui.js';
+import { amountOf, categoryIconHtml, categoryMeta, fmtSats, fmtTime, isIncome } from '../utils/ui.js';
 import van from '../vendor/van.js';
 
 const { b, button, div, i, span } = van.tags;
@@ -37,7 +36,7 @@ export function txRow(tx, linkedIds = null) {
       span({
         class: 'ic',
         style: `color:${meta.color}`,
-        innerHTML: Icons[meta.icon] || Icons.file,
+        innerHTML: categoryIconHtml(meta),
       })
     ),
     div(

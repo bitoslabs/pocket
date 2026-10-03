@@ -16,7 +16,7 @@ import { categoryService } from '../services/category-service.js';
 import { entryPrefs } from '../services/entry-prefs.js';
 import { authService } from '../services/auth-service.js';
 import { Icons } from '../utils/icons.js';
-import { MOODS, categoryMeta, moodLabel, playFX, toast } from '../utils/ui.js';
+import { MOODS, categoryIconHtml, categoryMeta, moodLabel, playFX, toast } from '../utils/ui.js';
 import van from '../vendor/van.js';
 
 const { button, div, input, span, textarea } = van.tags;
@@ -177,7 +177,7 @@ export function openComposer({ mood = null, onSaved = null } = {}) {
           span({
             class: 'ic',
             style: `color:${meta.color}`,
-            innerHTML: Icons[meta.icon] || Icons.file,
+            innerHTML: categoryIconHtml(meta),
           }),
           categoryLabel(c.id, c.name || meta.label)
         );

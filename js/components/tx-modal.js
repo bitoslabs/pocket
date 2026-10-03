@@ -15,7 +15,7 @@ import { categoryService } from '../services/category-service.js';
 import { priceService } from '../services/price-service.js';
 import { entryPrefs } from '../services/entry-prefs.js';
 import { Icons } from '../utils/icons.js';
-import { categoryMeta, fmtSats, playFX, toast } from '../utils/ui.js';
+import { categoryIconHtml, categoryMeta, fmtSats, playFX, toast } from '../utils/ui.js';
 import van from '../vendor/van.js';
 
 const { button, div, input, span } = van.tags;
@@ -165,7 +165,7 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
           span({
             class: 'ic',
             style: `color:${meta.color}`,
-            innerHTML: Icons[meta.icon] || Icons.file,
+            innerHTML: categoryIconHtml(meta),
           }),
           categoryLabel(c.id, c.name || meta.label)
         );

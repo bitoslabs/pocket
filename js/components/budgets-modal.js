@@ -11,8 +11,7 @@ import { modal } from './modal.js';
 import { t, categoryLabel } from '../core/i18n.js';
 import { budgetService } from '../services/budget-service.js';
 import { categoryService } from '../services/category-service.js';
-import { Icons } from '../utils/icons.js';
-import { categoryMeta, toast } from '../utils/ui.js';
+import { categoryIconHtml, categoryMeta, toast } from '../utils/ui.js';
 import van from '../vendor/van.js';
 
 const { div, input, label, span } = van.tags;
@@ -34,7 +33,7 @@ export function openBudgetsModal({ onSaved = null } = {}) {
           span({
             class: 'ic',
             style: `color:${meta.color}`,
-            innerHTML: Icons[meta.icon] || Icons.file,
+            innerHTML: categoryIconHtml(meta),
           })
         ),
         label(categoryLabel(c.id, c.name || meta.label)),

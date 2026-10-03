@@ -2122,10 +2122,7 @@
   display: grid;
   place-items: center;
   overflow: hidden;
-  box-shadow: 0 18px 48px var(--accent-soft),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  animation: loaderPop 620ms cubic-bezier(0.2, 0.9, 0.3, 1.35) both,
-    loaderGlow 2.6s ease-in-out 620ms infinite;
+  animation: loaderPop 620ms cubic-bezier(0.2, 0.9, 0.3, 1.35) both;
 }
 
 .loader-mark img {
@@ -2223,18 +2220,6 @@
   }
   50% {
     transform: translateY(4px);
-  }
-}
-
-@keyframes loaderGlow {
-  0%,
-  100% {
-    box-shadow: 0 18px 40px var(--accent-soft),
-      inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  }
-  50% {
-    box-shadow: 0 22px 60px color-mix(in srgb, var(--accent) 55%, transparent),
-      0 0 26px var(--accent-soft), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   }
 }
 
@@ -2885,4 +2870,3 @@
     opacity: 1;
   }
 }
-

@@ -130,11 +130,8 @@ a.side-brand:active {
 .brand-mark {
   width: 32px;
   height: 32px;
-  border-radius: 10px;
   display: grid;
   place-items: center;
-  overflow: hidden;
-  box-shadow: 0 4px 14px var(--accent-soft);
 }
 
 .brand-mark img {

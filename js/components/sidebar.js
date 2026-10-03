@@ -50,9 +50,9 @@ export class Sidebar extends Component {
 
     return [
       a(
-        { class: 'side-brand', href: '#home', 'aria-label': 'PocketZap' },
+        { class: 'side-brand font-mono', href: '#home', 'aria-label': 'PocketZap' },
         span({ class: 'brand-mark' }, img({ src: 'assets/icons/logo-motion.svg', alt: '' })),
-        span({ class: 'brand-name' }, 'Pocket', em('Zap'))
+        span({ class: 'brand-name font-mono' }, 'Pocket', em('Zap'))
       ),
       nav({ class: 'side-nav' }, NAV.map(navLink)),
       button(

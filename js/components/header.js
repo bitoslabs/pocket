@@ -158,7 +158,7 @@ export class Header extends Component {
         ? ''
         : a(
             { class: 'brand', href: '#home', 'aria-label': 'PocketZap' },
-            span({ class: 'brand-mark' }, img({ src: 'assets/icons/logo.svg', alt: '' })),
+            span({ class: 'brand-mark' }, img({ src: 'assets/icons/logo-motion.svg', alt: '' })),
             span({ class: 'brand-name' }, 'Pocket', em('Zap'))
           );
 

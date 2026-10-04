@@ -18,6 +18,7 @@ import { Icons } from '../utils/icons.js';
 import {
   MOODS,
   allTimeBalance,
+  cashBalance,
   categoryMeta,
   fiatLabel,
   fmtSats,
@@ -43,6 +44,8 @@ export class HomePage extends Component {
     this.watchStore('isAuthenticated', () => this.render());
     this.watchStore('price', () => this.render());
     this.watchStore('sync', () => this.render());
+    this.watchStore('accounts', () => this.render());
+    this.watchStore('assets', () => this.render());
   }
 
   template() {
@@ -51,8 +54,9 @@ export class HomePage extends Component {
     const authenticated = store.get('isAuthenticated');
 
     const now = new Date();
-    const { tin, tout } = monthTotals(transactions, now.getFullYear(), now.getMonth());
-    const balance = allTimeBalance(transactions);
+    const totals = monthTotals(transactions, now.getFullYear(), now.getMonth());
+    const accounts = store.get('accounts') || [];
+    const balance = accounts.length ? cashBalance(transactions, accounts) : allTimeBalance(transactions);
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -89,7 +93,7 @@ export class HomePage extends Component {
       div({ class: 'hi-sub' }, `${dateStr} · ${t('dashboard.privateCorner')}`),
       showLocalNotice ? this._localNotice() : null,
       authenticated ? null : this._connectCard(),
-      this._balanceBlock(balance, tin, tout),
+      this._balanceBlock(balance, totals, accounts),
       this._todayCard(todayEntry),
       topBudgets.length ? this._budgetsCard(topBudgets) : null,
       this._recentCard(recent, linkedIds)
@@ -130,18 +134,35 @@ export class HomePage extends Component {
     );
   }
 
-  _balanceBlock(balance, tin, tout) {
-    const conv = fiatLabel(balance);
+  _balanceBlock(balance, totals, accounts = []) {
+    const { tin, tout, invested, returned, netCashFlow } = totals;
+    const unit = accounts.length ? accounts[0].currency || 'SATS' : 'SATS';
+    const isSats = unit === 'SATS';
+    const conv = isSats ? fiatLabel(balance) : '';
     return div(
       { class: 'balance' },
-      div({ class: 'bal-label' }, t('dashboard.satoshiBalance')),
-      div({ class: 'bal-num' }, fmtFull(balance), small(t('common.sats'))),
+      div({ class: 'bal-label' }, t('dashboard.cashBalance')),
+      div({ class: 'bal-num' }, fmtFull(balance), small(isSats ? t('common.sats') : unit)),
       conv ? div({ class: 'bal-conv' }, `${fmtFull(balance)} ${t('common.sats')} ~ ${conv}`) : null,
-      div({ class: 'bal-btc' }, toBTC(balance)),
+      isSats ? div({ class: 'bal-btc' }, toBTC(balance)) : null,
       div(
         { class: 'bal-row' },
-        this._balanceCell('in', 'downLeft', t('dashboard.inMonth'), fmtSats(tin), fiatLabel(tin)),
-        this._balanceCell(null, 'upRight', t('dashboard.outMonth'), fmtSats(tout), fiatLabel(tout))
+        this._balanceCell('in', 'downLeft', t('dashboard.incomeMonth'), fmtSats(tin), isSats ? fiatLabel(tin) : ''),
+        this._balanceCell(null, 'upRight', t('dashboard.expensesMonth'), fmtSats(tout), isSats ? fiatLabel(tout) : '')
+      ),
+      div(
+        { class: 'bal-row' },
+        this._balanceCell(null, 'trending', t('dashboard.invested'), fmtSats(invested), ''),
+        this._balanceCell(
+          netCashFlow >= 0 ? 'in' : null,
+          'swap',
+          t('dashboard.netCashFlow'),
+          `${netCashFlow >= 0 ? '+' : '−'}${fmtSats(Math.abs(netCashFlow))}`,
+          ''
+        ),
+        returned
+          ? this._balanceCell('in', 'undo', t('dashboard.returnedPrincipal'), fmtSats(returned), '')
+          : null
       )
     );
   }

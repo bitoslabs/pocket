@@ -194,6 +194,8 @@ class PriceService {
   /** Fiat for a stored transaction/entry: uses its recorded fiat when present. */
   fiatFor(item) {
     if (!item) return '';
+    // Native-unit records (accounts/assets) already store a currency amount.
+    if (item.unit && item.unit !== 'SATS') return this.formatAmount(item.amount, item.unit);
     if (item.fiatAmount !== undefined && item.fiatAmount !== null && item.currency) {
       return this.formatAmount(item.fiatAmount, item.currency);
     }

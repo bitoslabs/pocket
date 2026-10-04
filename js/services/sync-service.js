@@ -23,6 +23,7 @@ import { categoryService } from './category-service.js';
 import { budgetService } from './budget-service.js';
 import { recurringService } from './recurring-service.js';
 import { journalService } from './journal-service.js';
+import { ledgerService } from './ledger-service.js';
 
 const APP_TAG = 'nostr-zap-journal';
 const KIND_APP_DATA = 30078;
@@ -34,6 +35,8 @@ const ENTITY_STORE = {
   category: 'categories',
   recurring: 'recurring',
   journal: 'journal',
+  account: 'accounts',
+  asset: 'assets',
 };
 
 const FLUSH_DEBOUNCE = 800;
@@ -375,6 +378,14 @@ class SyncService {
       entries.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
       store.set('journal', entries);
     }
+    if (entity === 'account' || entity === 'asset') {
+      const key = entity === 'account' ? 'accounts' : 'assets';
+      const list = [...(store.get(key) || [])];
+      const i = list.findIndex((x) => x.id === record.id);
+      if (i >= 0) list[i] = record;
+      else list.push(record);
+      store.set(key, list);
+    }
   }
 
   _removeFromState(entity, id) {
@@ -382,6 +393,9 @@ class SyncService {
       store.set('transactions', (store.get('transactions') || []).filter((t) => t.id !== id));
     } else if (entity === 'journal') {
       store.set('journal', (store.get('journal') || []).filter((e) => e.id !== id));
+    } else if (entity === 'account' || entity === 'asset') {
+      const key = entity === 'account' ? 'accounts' : 'assets';
+      store.set(key, (store.get(key) || []).filter((x) => x.id !== id));
     }
   }
 
@@ -389,6 +403,7 @@ class SyncService {
     await categoryService.init();
     await budgetService.init();
     await recurringService.init();
+    await ledgerService.init();
     if (owner && authService.isAuthenticated()) {
       await journalService.init(owner);
     }

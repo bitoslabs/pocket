@@ -34,11 +34,14 @@ import {
   categoryMeta,
   copyText,
   fmtSats,
+  isExpense,
   isIncome,
   shortNpub,
   toast,
   toMs,
 } from '../utils/ui.js';
+import { ledgerService } from '../services/ledger-service.js';
+import { accountBalance, assetPositions } from '../utils/ledger.js';
 import van from '../vendor/van.js';
 
 const { a, b, button, code, div, h2, h3, img, input, label, option, p, select, span, textarea } =
@@ -69,6 +72,8 @@ export class ProfilePage extends Component {
     this.watchStore('price', () => this.render());
     this.watchStore('sync', () => this.render());
     this.watchStore('profileMeta', () => this.render());
+    this.watchStore('accounts', () => this.render());
+    this.watchStore('assets', () => this.render());
     [
       Events.CATEGORY_CREATED,
       Events.CATEGORY_UPDATED,
@@ -119,11 +124,11 @@ export class ProfilePage extends Component {
 
     const tin = txs.filter(isIncome).reduce((acc, tx) => acc + (Number(tx.amount) || 0), 0);
     const tout = txs
-      .filter((tx) => !isIncome(tx))
+      .filter(isExpense)
       .reduce((acc, tx) => acc + (Number(tx.amount) || 0), 0);
 
     const spentAll = {};
-    txs.filter((tx) => !isIncome(tx)).forEach((tx) => {
+    txs.filter(isExpense).forEach((tx) => {
       const k = tx.category || 'uncategorized';
       spentAll[k] = (spentAll[k] || 0) + (Number(tx.amount) || 0);
     });
@@ -155,6 +160,7 @@ export class ProfilePage extends Component {
       topCat ? this._topCatCard(topCat) : null,
       this._appearanceCard(themeMode, accent),
       this._languageCard(),
+      this._ledgerCard(txs),
       this._categoriesCard(),
       this._moneyRateCard(price),
       this._syncCard(sync, relays, authenticated),
@@ -359,6 +365,48 @@ export class ProfilePage extends Component {
           );
         })
       )
+    );
+  }
+
+  _ledgerCard(txs) {
+    const accounts = ledgerService.getAccounts();
+    const assets = ledgerService.getAssets();
+    if (!accounts.length && !assets.length) return null;
+
+    const primary = ledgerService.primaryAccount();
+    const positions = assetPositions(txs);
+
+    return div(
+      { class: 'card' },
+      div({ class: 'card-head' }, h3(t('profile.ledger'))),
+      accounts.map((a) => {
+        const bal = accountBalance(txs, a, { attributeUnassigned: a.id === primary?.id });
+        return div(
+          { class: 'set-row', style: 'cursor:default' },
+          this._ic('bank'),
+          span(
+            { style: 'flex:1' },
+            b(a.name),
+            span(`${a.currency} · ${t('profile.opening')} ${fmtSats(a.openingBalance)}`)
+          ),
+          b({ style: 'color:var(--in)' }, fmtSats(bal))
+        );
+      }),
+      assets.map((a) => {
+        const p = positions[a.id];
+        const qty = p ? p.quantity : 0;
+        const cost = p ? p.costBasis : 0;
+        return div(
+          { class: 'set-row', style: 'cursor:default' },
+          this._ic('trending'),
+          span(
+            { style: 'flex:1' },
+            b(a.name || t('tx.asset')),
+            span(`${t('assetSubtype.' + a.subtype)}${qty ? ` · ${qty}` : ''}`)
+          ),
+          b({ style: 'color:var(--accent-2)' }, fmtSats(cost))
+        );
+      })
     );
   }
 
@@ -825,6 +873,8 @@ export class ProfilePage extends Component {
           await storageService.clear('transactions');
           await storageService.clear('journal');
           await storageService.clear('events');
+          await storageService.clear('accounts');
+          await storageService.clear('assets');
         } catch (err) {
           /* ignore */
         }
@@ -1094,6 +1144,8 @@ export class ProfilePage extends Component {
       version: config.app.version,
       exported_at: new Date().toISOString(),
       transactions: store.get('transactions') || [],
+      accounts: store.get('accounts') || [],
+      assets: store.get('assets') || [],
       journal: (store.get('journal') || []).map((e) => ({
         id: e.id,
         title: e.title,

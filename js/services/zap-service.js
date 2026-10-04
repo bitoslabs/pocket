@@ -14,6 +14,16 @@ import { storageService } from './storage-service.js';
 import { outbox } from './outbox.js';
 import { categoryService } from './category-service.js';
 import { recurringService } from './recurring-service.js';
+import { ledgerService } from './ledger-service.js';
+import {
+    TX_TYPES,
+    amountOf,
+    availableQuantity,
+    cashBalance,
+    isExpense,
+    isIncome,
+    periodTotals,
+} from '../utils/ledger.js';
 
 class ZapService {
     constructor() {
@@ -252,22 +262,23 @@ class ZapService {
      */
     getStats() {
         const transactions = store.get('transactions') || [];
+        const now = new Date();
+        const totals = periodTotals(transactions, now.getFullYear(), now.getMonth());
 
-        const income = transactions
-            .filter(t => t.type === 'income')
-            .reduce((sum, t) => sum + t.amount, 0);
-
-        const expenses = transactions
-            .filter(t => t.type === 'expense')
-            .reduce((sum, t) => sum + t.amount, 0);
+        const income = transactions.filter(isIncome).reduce((sum, t) => sum + amountOf(t), 0);
+        const expenses = transactions.filter(isExpense).reduce((sum, t) => sum + amountOf(t), 0);
 
         return {
             totalIncome: income,
             totalExpenses: expenses,
-            balance: income - expenses,
+            // Cash balance includes opening balances and every cash movement.
+            balance: cashBalance(transactions, store.get('accounts') || []),
+            invested: totals.invested,
+            returned: totals.returned,
+            netCashFlow: totals.netCashFlow,
             transactionCount: transactions.length,
-            incomeCount: transactions.filter(t => t.type === 'income').length,
-            expenseCount: transactions.filter(t => t.type === 'expense').length
+            incomeCount: transactions.filter(isIncome).length,
+            expenseCount: transactions.filter(isExpense).length
         };
     }
 
@@ -301,14 +312,36 @@ class ZapService {
             amount: parseFloat(transactionData.amount),
             description: transactionData.description?.trim() || '',
             category: transactionData.category || null,
-            created_at: transactionData.date || Date.now(),
+            created_at: transactionData.occurredAt || transactionData.date || Date.now(),
             isManual: true,
             source: transactionData.source || 'manual' // manual, recurring, etc.
         };
 
-        // Optional fiat snapshot (currency + amount at time of entry)
+        // Ledger links (accounts, assets) and quantity
+        for (const key of ['fromAccountId', 'toAccountId', 'assetId', 'direction']) {
+            if (transactionData[key] !== undefined && transactionData[key] !== null) {
+                transaction[key] = transactionData[key];
+            }
+        }
+        const qty = parseFloat(transactionData.assetQuantity);
+        if (Number.isFinite(qty) && qty > 0) transaction.assetQuantity = qty;
+
+        // Native unit of `amount`. Accounts carry the currency; a simple expense
+        // without an account stays a legacy sats record (no unit).
+        let unit = transactionData.unit ? String(transactionData.unit).toUpperCase() : null;
+        if (!unit) {
+            const accountId = transactionData.fromAccountId || transactionData.toAccountId;
+            unit = accountId ? ledgerService.getAccount(accountId)?.currency || null : null;
+        }
+        if (unit) {
+            transaction.unit = unit;
+            transaction.currency = unit;
+        }
+
+        // Optional fiat snapshot (currency + amount at time of entry) for legacy
+        // sats records. Native-unit records use `unit` instead.
         const fiatAmount = parseFloat(transactionData.fiatAmount);
-        if (Number.isFinite(fiatAmount) && transactionData.currency) {
+        if (!unit && Number.isFinite(fiatAmount) && transactionData.currency) {
             transaction.fiatAmount = fiatAmount;
             transaction.currency = String(transactionData.currency).toUpperCase();
         }
@@ -530,23 +563,60 @@ class ZapService {
      * @private
      */
     _validateManualTransaction(transaction) {
-        if (!transaction.amount || transaction.amount <= 0) {
+        const amount = Number(transaction.amount);
+        if (!Number.isFinite(amount) || amount <= 0) {
             throw new Error('Amount must be greater than 0');
         }
 
-        if (!['income', 'expense'].includes(transaction.type)) {
-            throw new Error('Type must be income or expense');
+        // Unknown types are rejected rather than silently treated as an expense.
+        if (!TX_TYPES.includes(transaction.type)) {
+            throw new Error(`Unsupported transaction type: ${transaction.type}`);
         }
 
-        if (transaction.category) {
-            const category = categoryService.getCategory(transaction.category);
-            if (!category) {
-                throw new Error('Invalid category');
+        switch (transaction.type) {
+            case 'transfer':
+                if (!transaction.fromAccountId || !transaction.toAccountId) {
+                    throw new Error('Transfer needs a source and destination account');
+                }
+                if (transaction.fromAccountId === transaction.toAccountId) {
+                    throw new Error('Transfer accounts must be different');
+                }
+                break;
+
+            case 'investment':
+                if (!transaction.fromAccountId) throw new Error('Investment needs a cash account');
+                if (!transaction.assetId) throw new Error('Investment needs an asset');
+                break;
+
+            case 'investment_return': {
+                if (!transaction.toAccountId) throw new Error('Return needs a cash account');
+                if (!transaction.assetId) throw new Error('Return needs an asset');
+                const qty = Number(transaction.assetQuantity) || 0;
+                if (qty > 0) {
+                    // Exclude this record so edits can re-save with the same quantity.
+                    const others = (store.get('transactions') || []).filter(t => t.id !== transaction.id);
+                    const held = availableQuantity(others, transaction.assetId);
+                    if (qty > held + 1e-9) throw new Error('Not enough asset quantity to return');
+                }
+                break;
             }
 
-            // Check if category type matches transaction type
-            if (category.type !== 'both' && category.type !== transaction.type) {
-                throw new Error(`Category ${category.name} cannot be used for ${transaction.type} transactions`);
+            default:
+                break;
+        }
+
+        // Category type rules only apply to operating income/expense.
+        if (transaction.type === 'income' || transaction.type === 'expense') {
+            if (transaction.category) {
+                const category = categoryService.getCategory(transaction.category);
+                if (!category) {
+                    throw new Error('Invalid category');
+                }
+
+                // Check if category type matches transaction type
+                if (category.type !== 'both' && category.type !== transaction.type) {
+                    throw new Error(`Category ${category.name} cannot be used for ${transaction.type} transactions`);
+                }
             }
         }
     }

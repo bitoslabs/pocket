@@ -20,10 +20,16 @@ import {
   fmtSats,
   groupByDay,
   inMonth,
+  isExpense,
   isIncome,
+  isInvestment,
+  isInvestmentReturn,
+  isTransfer,
   monthTotals,
   spentByCat,
   toMs,
+  txContextLabel,
+  txMeta,
 } from '../utils/ui.js';
 import { txRow } from '../components/tx-row.js';
 import { openBudgetsModal } from '../components/budgets-modal.js';
@@ -50,6 +56,8 @@ export class MoneyPage extends Component {
     this.watchStore('ui.query', () => this.render());
     this.watchStore('price', () => this.render());
     this.watchStore('sync', () => this.render());
+    this.watchStore('accounts', () => this.render());
+    this.watchStore('assets', () => this.render());
   }
 
   template() {
@@ -62,8 +70,11 @@ export class MoneyPage extends Component {
       year: 'numeric',
     });
     const monthTx = all.filter((tx) => inMonth(tx.created_at, y, m));
-    const { tin, tout, net } = monthTotals(all, y, m);
+    const totals = monthTotals(all, y, m);
+    const { tin, tout, invested, netCashFlow } = totals;
     const spent = spentByCat(all, y, m);
+    const accounts = store.get('accounts') || [];
+    const isSats = !accounts.length || accounts[0].currency === 'SATS';
 
     const catSegs = Object.entries(spent)
       .map(([cat, v]) => ({ cat, v, color: categoryMeta(cat).color }))
@@ -75,17 +86,18 @@ export class MoneyPage extends Component {
     const filtered = monthTx
       .filter((tx) => {
         if (filter === 'in') return isIncome(tx);
-        if (filter === 'out') return !isIncome(tx);
-        if (filter.startsWith('cat:')) return tx.category === filter.slice(4) && !isIncome(tx);
+        if (filter === 'out') return isExpense(tx);
+        if (filter === 'invest') return isInvestment(tx);
+        if (filter === 'return') return isInvestmentReturn(tx);
+        if (filter === 'transfer') return isTransfer(tx);
+        if (filter.startsWith('cat:')) return tx.category === filter.slice(4) && isExpense(tx);
         return true;
       })
       .filter((tx) => {
         if (!query) return true;
-        const meta = categoryMeta(tx.category);
-        return (
-          (tx.description || '').toLowerCase().includes(query) ||
-          meta.label.toLowerCase().includes(query)
-        );
+        const meta = txMeta(tx);
+        const hay = `${tx.description || ''} ${meta.label} ${txContextLabel(tx)}`.toLowerCase();
+        return hay.includes(query);
       })
       .sort((a, b2) => toMs(b2.created_at) - toMs(a.created_at));
 
@@ -102,7 +114,7 @@ export class MoneyPage extends Component {
         t('money.title')
       ),
       this._monthNav(label),
-      this._statGrid(tin, tout, net, monthTx.length),
+      this._statGrid(totals, monthTx.length, isSats),
       this._splitCard(tin, tout),
       this._donutCard(catSegs, top, restV, totalOut),
       this._budgetsCard(progress),
@@ -127,7 +139,8 @@ export class MoneyPage extends Component {
     );
   }
 
-  _statGrid(tin, tout, net, count) {
+  _statGrid(totals, count, isSats = true) {
+    const { tin, tout, invested, returned, netCashFlow } = totals;
     const stat = (valueNode, labelText, fiat) =>
       div(
         { class: 'stat' },
@@ -140,17 +153,25 @@ export class MoneyPage extends Component {
       stat(
         b({ class: 'vin' }, span({ innerHTML: Icons.downLeft }), fmtSats(tin)),
         t('money.inThisMonth'),
-        fiatLabel(tin)
+        isSats ? fiatLabel(tin) : ''
       ),
       stat(
         b({ class: 'vout' }, span({ innerHTML: Icons.upRight }), fmtSats(tout)),
         t('money.outThisMonth'),
-        fiatLabel(tout)
+        isSats ? fiatLabel(tout) : ''
       ),
       stat(
-        b({ class: 'vnet' }, `${net >= 0 ? '+' : '−'}${fmtSats(Math.abs(net))}`),
-        t('money.netSats'),
-        fiatLabel(net)
+        b({ class: 'vin' }, span({ innerHTML: Icons.trending }), fmtSats(invested)),
+        t('money.investedThisMonth'),
+        ''
+      ),
+      stat(
+        b(
+          { class: 'vnet' },
+          `${netCashFlow >= 0 ? '+' : '−'}${fmtSats(Math.abs(netCashFlow))}`
+        ),
+        t('money.netCashFlow'),
+        returned ? `${t('money.returned')} ${fmtSats(returned)}` : ''
       ),
       stat(b(`${count}`), t('money.transactions'), null)
     );
@@ -273,6 +294,9 @@ export class MoneyPage extends Component {
       chip('all', t('money.filterAll')),
       chip('in', t('money.filterIncome')),
       chip('out', t('money.filterExpense')),
+      chip('invest', t('money.filterInvestments')),
+      chip('return', t('money.filterReturns')),
+      chip('transfer', t('money.filterTransfers')),
       catSegs.slice(0, 4).map((s) => chip('cat:' + s.cat, categoryMeta(s.cat).label))
     );
   }

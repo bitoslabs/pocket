@@ -6,18 +6,45 @@
  */
 
 import { eventBus, Events } from '../core/event-bus.js';
+import { store } from '../core/state.js';
 import { t, locale } from '../core/i18n.js';
 import { priceService } from '../services/price-service.js';
 import { categoryService } from '../services/category-service.js';
 import { Icons } from './icons.js';
+import {
+  amountOf,
+  assetHolding,
+  cashBalance,
+  inMonth,
+  isAdjustment,
+  isExpense,
+  isIncome,
+  isInvestment,
+  isInvestmentReturn,
+  isNonOperating,
+  isTransfer,
+  periodTotals,
+  spentByCategory,
+  toMs,
+  totalCashDelta,
+} from './ledger.js';
 
 /* ==================== Time ==================== */
 
-/** Normalize a timestamp that may be in seconds or milliseconds. */
-export function toMs(ts) {
-  if (!ts) return Date.now();
-  return ts < 1e12 ? ts * 1000 : ts;
-}
+export {
+  amountOf,
+  assetHolding,
+  cashBalance,
+  inMonth,
+  isAdjustment,
+  isExpense,
+  isIncome,
+  isInvestment,
+  isInvestmentReturn,
+  isNonOperating,
+  isTransfer,
+  toMs,
+};
 
 export function fmtTime(ts) {
   return new Date(toMs(ts)).toLocaleTimeString([], {
@@ -55,42 +82,98 @@ export const fmtFull = (n) => (Number(n) || 0).toLocaleString('en-US');
 
 export const toBTC = (n) => '₿ ' + ((Number(n) || 0) / 1e8).toFixed(8);
 
-export const isIncome = (tx) => tx && tx.type === 'income';
-
-export const amountOf = (tx) => Number(tx?.amount) || 0;
-
-export function inMonth(ts, year, month) {
-  const d = new Date(toMs(ts));
-  return d.getFullYear() === year && d.getMonth() === month;
-}
-
+/** Period totals by type. `tout` is operating spending only. */
 export function monthTotals(transactions, year, month) {
-  let tin = 0;
-  let tout = 0;
-  (transactions || []).forEach((t) => {
-    if (!inMonth(t.created_at, year, month)) return;
-    if (isIncome(t)) tin += amountOf(t);
-    else tout += amountOf(t);
-  });
-  return { tin, tout, net: tin - tout };
+  const totals = periodTotals(transactions, year, month);
+  return {
+    tin: totals.income,
+    tout: totals.expenses,
+    net: totals.income - totals.expenses,
+    invested: totals.invested,
+    returned: totals.returned,
+    adjustments: totals.adjustments,
+    netCashFlow: totals.netCashFlow,
+  };
 }
 
+/** All-time cash movement (opening balances live on accounts, not here). */
 export function allTimeBalance(transactions) {
-  let b = 0;
-  (transactions || []).forEach((t) => {
-    b += isIncome(t) ? amountOf(t) : -amountOf(t);
-  });
-  return b;
+  return (transactions || []).reduce((b, t) => b + totalCashDelta(t), 0);
 }
 
 export function spentByCat(transactions, year, month) {
-  const out = {};
-  (transactions || []).forEach((t) => {
-    if (isIncome(t) || !inMonth(t.created_at, year, month)) return;
-    const key = t.category || 'uncategorized';
-    out[key] = (out[key] || 0) + amountOf(t);
-  });
-  return out;
+  return spentByCategory(transactions, year, month);
+}
+
+/** The unit a transaction amount is stored in (legacy records are sats). */
+export function amountUnit(tx) {
+  return tx?.unit || null;
+}
+
+/** Display the absolute amount of a transaction in its own unit. */
+export function txAmountText(tx) {
+  const n = Math.abs(amountOf(tx));
+  const unit = amountUnit(tx);
+  if (unit && unit !== 'SATS') {
+    if (unit === 'BTC') return toBTC(n);
+    return priceService.formatAmount(n, unit);
+  }
+  return fmtSats(n);
+}
+
+/** Cash direction of a transaction: 'in' | 'out' | 'neutral'. */
+export function txDirection(tx) {
+  switch (tx?.type) {
+    case 'income':
+    case 'investment_return':
+      return 'in';
+    case 'expense':
+    case 'investment':
+      return 'out';
+    case 'adjustment':
+      return totalCashDelta(tx) >= 0 ? 'in' : 'out';
+    default:
+      return 'neutral';
+  }
+}
+
+/** Icon/label metadata for any transaction type. */
+export function txMeta(tx) {
+  switch (tx?.type) {
+    case 'transfer':
+      return { label: t('tx.transfer'), color: '#38BDF8', icon: 'swap', emoji: '' };
+    case 'investment':
+      return { label: t('tx.investment'), color: '#1890FF', icon: 'trending', emoji: '' };
+    case 'investment_return':
+      return { label: t('tx.investmentReturn'), color: '#4ADE80', icon: 'undo', emoji: '' };
+    case 'adjustment':
+      return { label: t('tx.adjustment'), color: '#94A3B8', icon: 'spark', emoji: '' };
+    default:
+      return categoryMeta(tx?.category);
+  }
+}
+
+export function accountLabel(id) {
+  if (!id) return '';
+  const account = (store.get('accounts') || []).find((a) => a.id === id);
+  return account?.name || '';
+}
+
+export function assetLabel(id) {
+  if (!id) return '';
+  const asset = (store.get('assets') || []).find((a) => a.id === id);
+  return asset?.name || '';
+}
+
+/** Human route for investment/return/transfer rows, e.g. `BCEL → Bitcoin`. */
+export function txContextLabel(tx) {
+  const from = accountLabel(tx?.fromAccountId);
+  const to = accountLabel(tx?.toAccountId);
+  const asset = assetLabel(tx?.assetId);
+  if (isTransfer(tx)) return [from, to].filter(Boolean).join(' → ');
+  if (isInvestment(tx)) return [from, asset].filter(Boolean).join(' → ');
+  if (isInvestmentReturn(tx)) return [asset, to].filter(Boolean).join(' → ');
+  return '';
 }
 
 /* ==================== Categories ==================== */

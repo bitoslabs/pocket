@@ -228,16 +228,15 @@ class BudgetService {
         const now = Date.now();
         const periodRange = this._getPeriodRange(budget.period, budget.startDate, budget.endDate, now);
         
-        // Get transactions for this budget period
+        // Budgets count operating expenses only — investments, returns and
+        // transfers are never spending.
         const transactions = zapService.getTransactions({
             category: budget.categoryId,
             startDate: periodRange.start,
             endDate: periodRange.end
-        });
+        }).filter(tx => tx.type === 'expense');
 
-        const spent = transactions
-            .filter(tx => tx.type === 'expense')
-            .reduce((sum, tx) => sum + tx.amount, 0);
+        const spent = transactions.reduce((sum, tx) => sum + tx.amount, 0);
 
         const remaining = budget.amount - spent;
         // Real, unclamped utilization. Consumers clamp for bar widths but the

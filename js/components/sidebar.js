@@ -70,7 +70,12 @@ export class Sidebar extends Component {
         div(
           { class: 'sb-stat' },
           b({ class: 'vout', innerHTML: () => `${Icons.upRight}${fmtSats(totals().tout)}` }),
-          span(t('dashboard.outMonth'))
+          span(t('dashboard.expensesMonth'))
+        ),
+        div(
+          { class: 'sb-stat' },
+          b({ class: 'vout', innerHTML: () => `${Icons.trending}${fmtSats(totals().invested)}` }),
+          span(t('dashboard.invested'))
         )
       ),
       div(

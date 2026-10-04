@@ -93,6 +93,19 @@ class StorageService {
                     recurringStore.createIndex('isActive', 'isActive', { unique: false });
                 }
 
+                // Cash accounts + investment assets (cost-basis ledger)
+                if (!db.objectStoreNames.contains('accounts')) {
+                    const accountsStore = db.createObjectStore('accounts', { keyPath: 'id' });
+                    accountsStore.createIndex('owner', 'owner', { unique: false });
+                    accountsStore.createIndex('currency', 'currency', { unique: false });
+                }
+
+                if (!db.objectStoreNames.contains('assets')) {
+                    const assetsStore = db.createObjectStore('assets', { keyPath: 'id' });
+                    assetsStore.createIndex('owner', 'owner', { unique: false });
+                    assetsStore.createIndex('subtype', 'subtype', { unique: false });
+                }
+
                 // Offline-first sync: queued mutations + per-account sync metadata
                 if (!db.objectStoreNames.contains('outbox')) {
                     const outboxStore = db.createObjectStore('outbox', { keyPath: 'id' });

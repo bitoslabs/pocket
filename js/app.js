@@ -22,6 +22,7 @@ import { journalService } from './services/journal-service.js';
 import { categoryService } from './services/category-service.js';
 import { budgetService } from './services/budget-service.js';
 import { recurringService } from './services/recurring-service.js';
+import { ledgerService } from './services/ledger-service.js';
 import { priceService } from './services/price-service.js';
 import { syncService } from './services/sync-service.js';
 
@@ -86,6 +87,8 @@ class App {
             await budgetService.init();
             await recurringService.init();
 
+            await ledgerService.init();
+
             if (authService.isAuthenticated()) {
                 const pubkey = authService.getPublicKey();
                 await zapService.init(pubkey);
@@ -126,10 +129,11 @@ class App {
         eventBus.on(Events.AUTH_LOGIN, async (user) => {
             await zapService.init(user.pubkey);
             await journalService.init(user.pubkey);
-            // Re-scope local config data (categories/budgets/recurring) to the account
+            // Re-scope local config data (categories/budgets/recurring/assets) to the account
             await categoryService.init();
             await budgetService.init();
             await recurringService.init();
+            await ledgerService.init();
         });
 
         eventBus.on(Events.AUTH_LOGOUT, async () => {
@@ -141,6 +145,7 @@ class App {
             await categoryService.init();
             await budgetService.init();
             await recurringService.init();
+            await ledgerService.init();
         });
 
         eventBus.on(Events.ERROR, ({ message }) => {

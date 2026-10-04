@@ -59,7 +59,7 @@ export const config = {
             CATEGORIES: 'categories'
         },
         dbName: 'NostrZapJournalDB',
-        dbVersion: 3
+        dbVersion: 4
     },
 
     // Internationalisation

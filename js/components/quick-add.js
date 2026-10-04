@@ -40,6 +40,22 @@ const ROWS = [
     titleKey: 'quickAdd.incomeTitle',
     subKey: 'quickAdd.incomeSub',
   },
+  {
+    choice: 'invest',
+    icon: 'trending',
+    bg: 'var(--accent-soft)',
+    fg: 'var(--accent-2)',
+    titleKey: 'quickAdd.investTitle',
+    subKey: 'quickAdd.investSub',
+  },
+  {
+    choice: 'transfer',
+    icon: 'swap',
+    bg: 'var(--accent-soft)',
+    fg: 'var(--accent-2)',
+    titleKey: 'quickAdd.transferTitle',
+    subKey: 'quickAdd.transferSub',
+  },
 ];
 
 export function openQuickAdd() {

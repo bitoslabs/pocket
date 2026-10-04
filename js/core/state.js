@@ -168,6 +168,8 @@ const initialState = {
     transactions: [],
     journal: [],
     categories: [],
+    accounts: [],
+    assets: [],
 
     // UI state
     ui: {

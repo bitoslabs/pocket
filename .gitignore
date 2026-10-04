@@ -31,3 +31,5 @@ deploy/*
 !deploy/graph.mjs
 !deploy/pocket.bitos.space.conf
 !deploy/site.md
+
+.vscode

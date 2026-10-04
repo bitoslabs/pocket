@@ -14,16 +14,15 @@ import { journalService } from '../services/journal-service.js';
 import { modal } from '../components/modal.js';
 import { Icons } from '../utils/icons.js';
 import {
-  categoryMeta,
   dayLabel,
-  fiatLabel,
-  fmtSats,
   groupByDay,
-  isIncome,
   moodById,
   moneyForEntry,
   toast,
   toMs,
+  txAmountText,
+  txDirection,
+  txMeta,
 } from '../utils/ui.js';
 import { openComposer } from '../components/journal-composer.js';
 import { openTxModal } from '../components/tx-modal.js';
@@ -154,13 +153,13 @@ export class JournalPage extends Component {
         ? div(
             { class: 'jmoney' },
             money.map((m) => {
-              const meta = categoryMeta(m.category);
-              const income = isIncome(m);
-              const fiat = fiatLabel(m.amount);
+              const meta = txMeta(m);
+              const dir = txDirection(m);
+              const sign = dir === 'in' ? '+' : dir === 'out' ? '−' : '';
               return span(
-                { class: `mchip ${income ? 'in' : 'out'}` },
+                { class: `mchip ${dir === 'in' ? 'in' : dir === 'out' ? 'out' : ''}` },
                 span({ innerHTML: Icons.bolt }),
-                `${income ? '+' : '−'}${fmtSats(m.amount)}${fiat ? ' · ' + fiat : ''} · ${meta.label}`
+                `${sign}${txAmountText(m)} · ${meta.label}`
               );
             })
           )

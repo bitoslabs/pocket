@@ -31,6 +31,7 @@ import {
 } from '../core/theme.js';
 import { Icons } from '../utils/icons.js';
 import {
+  categoryIconHtml,
   categoryMeta,
   copyText,
   fmtSats,
@@ -41,7 +42,7 @@ import {
   toMs,
 } from '../utils/ui.js';
 import { ledgerService } from '../services/ledger-service.js';
-import { accountBalance, assetPositions } from '../utils/ledger.js';
+import { ASSET_SUBTYPES, accountBalance, assetPositions } from '../utils/ledger.js';
 import van from '../vendor/van.js';
 
 const { a, b, button, code, div, h2, h3, img, input, label, option, p, select, span, textarea } =
@@ -59,6 +60,12 @@ function shortLn(address = '') {
 }
 
 export class ProfilePage extends Component {
+  constructor(options) {
+    super(options);
+    /** Active drill-down sub-page: null | 'categories' | 'accounts' | 'assets'. */
+    this._sub = null;
+  }
+
   mounted() {
     this.watchStore('user', () => {
       this.render();
@@ -116,6 +123,8 @@ export class ProfilePage extends Component {
   }
 
   template() {
+    if (this._sub) return this._subTemplate();
+
     const { npub, name, bio, picture, nip05, lud16 } = this._profile();
     const authenticated = store.get('isAuthenticated');
     const hasLocalKey = !!storageService.getLocal('auth_privkey');
@@ -160,8 +169,7 @@ export class ProfilePage extends Component {
       topCat ? this._topCatCard(topCat) : null,
       this._appearanceCard(themeMode, accent),
       this._languageCard(),
-      this._ledgerCard(txs),
-      this._categoriesCard(),
+      this._manageCard(),
       this._moneyRateCard(price),
       this._syncCard(sync, relays, authenticated),
       this._actionsCard({ authenticated, npub, appLock, hasLocalKey }),
@@ -368,45 +376,180 @@ export class ProfilePage extends Component {
     );
   }
 
-  _ledgerCard(txs) {
+  _manageCard() {
     const accounts = ledgerService.getAccounts();
     const assets = ledgerService.getAssets();
-    if (!accounts.length && !assets.length) return null;
+    const cats = categoryService.getCategories();
 
-    const primary = ledgerService.primaryAccount();
-    const positions = assetPositions(txs);
+    const row = (sub, icon, label, sublabel, count) =>
+      button(
+        { type: 'button', class: 'set-row', 'data-action': 'sub-open', 'data-sub': sub },
+        this._ic(icon),
+        span({ style: 'flex:1' }, b(label), span(sublabel)),
+        span({ class: 'manage-count' }, `${count}`),
+        span({ class: 'ic chev', innerHTML: Icons.chevR })
+      );
 
     return div(
-      { class: 'card' },
-      div({ class: 'card-head' }, h3(t('profile.ledger'))),
-      accounts.map((a) => {
-        const bal = accountBalance(txs, a, { attributeUnassigned: a.id === primary?.id });
-        return div(
-          { class: 'set-row', style: 'cursor:default' },
-          this._ic('bank'),
-          span(
-            { style: 'flex:1' },
-            b(a.name),
-            span(`${a.currency} · ${t('profile.opening')} ${fmtSats(a.openingBalance)}`)
-          ),
-          b({ style: 'color:var(--in)' }, fmtSats(bal))
-        );
-      }),
-      assets.map((a) => {
-        const p = positions[a.id];
-        const qty = p ? p.quantity : 0;
-        const cost = p ? p.costBasis : 0;
-        return div(
-          { class: 'set-row', style: 'cursor:default' },
-          this._ic('trending'),
-          span(
-            { style: 'flex:1' },
-            b(a.name || t('tx.asset')),
-            span(`${t('assetSubtype.' + a.subtype)}${qty ? ` · ${qty}` : ''}`)
-          ),
-          b({ style: 'color:var(--accent-2)' }, fmtSats(cost))
-        );
-      })
+      { class: 'card', style: 'padding:6px 16px' },
+      row('categories', 'tag', t('profile.categories'), t('profile.manageCategories'), cats.length),
+      row('accounts', 'bank', t('profile.accounts'), t('profile.manageAccounts'), accounts.length),
+      row('assets', 'trending', t('profile.assets'), t('profile.manageAssets'), assets.length)
+    );
+  }
+
+  // ==================== Drill-down management pages ====================
+
+  _subTemplate() {
+    const txs = store.get('transactions') || [];
+    if (this._sub === 'categories') return this._subCategories();
+    if (this._sub === 'accounts') return this._subAccounts(txs);
+    if (this._sub === 'assets') return this._subAssets(txs);
+    return '';
+  }
+
+  _subHeader(title, addAction, addLabel) {
+    return div(
+      { class: 'sub-head' },
+      button(
+        {
+          type: 'button',
+          class: 'btn-icon btn-ghost',
+          'data-action': 'sub-back',
+          'aria-label': t('common.back'),
+        },
+        this._ic('chevL')
+      ),
+      h2({ class: 'sub-title' }, title),
+      addAction
+        ? button({ class: 'btn btn-primary btn-sm', 'data-action': addAction }, addLabel)
+        : null
+    );
+  }
+
+  _subEmpty(icon, title, sub) {
+    return div(
+      { class: 'empty' },
+      div({ class: 'empty-ic', innerHTML: Icons[icon] }),
+      h3(title),
+      p(sub)
+    );
+  }
+
+  _subCategories() {
+    const cats = categoryService.getCategories();
+    const frag = document.createDocumentFragment();
+    van.add(
+      frag,
+      this._subHeader(t('profile.categories'), 'add-category', t('profile.addCategory')),
+      div(
+        { class: 'card', style: 'padding:6px 16px' },
+        cats.length
+          ? cats.map((cat) => this._categoryRow(cat))
+          : this._subEmpty('tag', t('profile.noCategories'), t('profile.noCategoriesSub'))
+      )
+    );
+    return frag;
+  }
+
+  _subAccounts(txs) {
+    const accounts = ledgerService.getAccounts();
+    const primary = ledgerService.primaryAccount();
+    const frag = document.createDocumentFragment();
+    van.add(
+      frag,
+      this._subHeader(t('profile.accounts'), 'add-account', t('profile.addAccount')),
+      div(
+        { class: 'card', style: 'padding:6px 16px' },
+        accounts.length
+          ? accounts.map((a) => {
+              const bal = accountBalance(txs, a, { attributeUnassigned: a.id === primary?.id });
+              return div(
+                { class: 'set-row', 'data-action': 'edit-account', 'data-id': a.id },
+                span({ class: 'set-ic' }, span({ class: 'ic', innerHTML: Icons.bank })),
+                span(
+                  { style: 'flex:1' },
+                  b(a.name),
+                  span(`${a.currency} · ${t('profile.opening')} ${fmtSats(a.openingBalance)}`)
+                ),
+                div(
+                  { class: 'row-end' },
+                  b({ style: 'color:var(--in)' }, fmtSats(bal)),
+                  a.isDefault ? span({ class: 'badge badge-neutral' }, t('profile.defaultBadge')) : null
+                ),
+                this._rowActions('account', a.id)
+              );
+            })
+          : this._subEmpty('bank', t('profile.noAccounts'), t('profile.noAccountsSub'))
+      )
+    );
+    return frag;
+  }
+
+  _subAssets(txs) {
+    const assets = ledgerService.getAssets();
+    const positions = assetPositions(txs);
+    const frag = document.createDocumentFragment();
+    van.add(
+      frag,
+      this._subHeader(t('profile.assets'), 'add-asset', t('profile.addAsset')),
+      div(
+        { class: 'card', style: 'padding:6px 16px' },
+        assets.length
+          ? assets.map((a) => {
+              const p = positions[a.id];
+              const qty = p ? p.quantity : 0;
+              const cost = p ? p.costBasis : 0;
+              return div(
+                { class: 'set-row', 'data-action': 'edit-asset', 'data-id': a.id },
+                span({ class: 'set-ic' }, span({ class: 'ic', innerHTML: Icons.trending })),
+                span(
+                  { style: 'flex:1' },
+                  b(a.name || t('tx.asset')),
+                  span(
+                    `${t('assetSubtype.' + a.subtype)}${a.symbol ? ` · ${a.symbol}` : ''}${
+                      qty ? ` · ${qty}` : ''
+                    }`
+                  )
+                ),
+                div(
+                  { class: 'row-end' },
+                  b({ style: 'color:var(--accent-2)' }, fmtSats(cost)),
+                  span({ class: 'sub-note' }, t('profile.costBasis'))
+                ),
+                this._rowActions('asset', a.id)
+              );
+            })
+          : this._subEmpty('trending', t('profile.noAssets'), t('profile.noAssetsSub'))
+      )
+    );
+    return frag;
+  }
+
+  /** Edit + delete buttons for a management row. */
+  _rowActions(kind, id) {
+    return div(
+      { class: 'row-actions' },
+      button(
+        {
+          type: 'button',
+          class: 'btn-icon btn-ghost',
+          'data-action': `edit-${kind}`,
+          'data-id': id,
+          'aria-label': t('common.edit'),
+        },
+        this._ic('edit')
+      ),
+      button(
+        {
+          type: 'button',
+          class: 'btn-icon btn-ghost danger',
+          'data-action': `delete-${kind}`,
+          'data-id': id,
+          'aria-label': t('common.delete'),
+        },
+        this._ic('trash')
+      )
     );
   }
 
@@ -662,22 +805,6 @@ export class ProfilePage extends Component {
     );
   }
 
-  _categoriesCard() {
-    const cats = categoryService.getCategories();
-    return div(
-      { class: 'card' },
-      div(
-        { class: 'card-head' },
-        h3(t('profile.categories')),
-        button(
-          { class: 'btn btn-ghost btn-sm', 'data-action': 'add-category' },
-          t('profile.addCategory')
-        )
-      ),
-      cats.map((cat) => this._categoryRow(cat))
-    );
-  }
-
   _categoryRow(cat) {
     const typeLabel =
       cat.type === 'income'
@@ -685,29 +812,36 @@ export class ProfilePage extends Component {
         : cat.type === 'both'
         ? t('profile.categoryBoth')
         : t('tx.expense');
+    const meta = categoryMeta(cat.id);
     return div(
       { class: 'set-row', style: 'cursor:default' },
-      span({ style: 'font-size:18px;line-height:1' }, cat.icon),
+      span(
+        { class: 'set-ic', style: `background:${meta.color}1F` },
+        span({ class: 'ic', style: `color:${meta.color}`, innerHTML: categoryIconHtml(meta) })
+      ),
       span({ style: 'flex:1' }, b(cat.name), span(typeLabel)),
       cat.isCustom
-        ? button(
-            { class: 'btn btn-ghost btn-sm', 'data-action': 'delete-category', 'data-id': cat.id },
-            t('common.delete')
-          )
-        : null
+        ? this._rowActions('category', cat.id)
+        : span({ class: 'badge badge-neutral' }, t('profile.defaultBadge'))
     );
   }
 
-  _openAddCategory() {
-    const nameEl = input({ type: 'text', id: 'catName', maxlength: '40' });
+  _openCategoryForm(cat = null) {
+    const nameEl = input({ type: 'text', id: 'catName', maxlength: '40', value: cat?.name || '' });
     const typeEl = select(
       { id: 'catType', class: 'input' },
-      option({ value: 'expense' }, t('tx.expense')),
-      option({ value: 'income' }, t('tx.income')),
-      option({ value: 'both' }, t('profile.categoryBoth'))
+      option({ value: 'expense', selected: (cat?.type || 'expense') === 'expense' }, t('tx.expense')),
+      option({ value: 'income', selected: cat?.type === 'income' }, t('tx.income')),
+      option({ value: 'both', selected: cat?.type === 'both' }, t('profile.categoryBoth'))
     );
-    const iconEl = input({ type: 'text', id: 'catIcon', maxlength: '2', placeholder: '📌' });
-    const colorEl = input({ type: 'color', id: 'catColor', value: '#8C8C8C' });
+    const iconEl = input({
+      type: 'text',
+      id: 'catIcon',
+      maxlength: '2',
+      placeholder: '📌',
+      value: cat?.icon || '',
+    });
+    const colorEl = input({ type: 'color', id: 'catColor', value: cat?.color || '#8C8C8C' });
 
     const content = div(
       label({ class: 'fld' }, t('profile.categoryName'), nameEl),
@@ -717,7 +851,7 @@ export class ProfilePage extends Component {
     );
 
     modal.open({
-      title: t('profile.newCategory'),
+      title: cat ? t('profile.editCategory') : t('profile.newCategory'),
       content,
       actions: [
         { label: t('common.cancel'), variant: 'btn-ghost', handler: () => {} },
@@ -731,18 +865,135 @@ export class ProfilePage extends Component {
               toast(t('profile.categoryName'), 'error');
               return false;
             }
+            const payload = {
+              name,
+              type: typeEl.value,
+              icon: iconEl.value || '📌',
+              color: colorEl.value,
+            };
             try {
-              await categoryService.createCategory({
-                name,
-                type: typeEl.value,
-                icon: iconEl.value || '📌',
-                color: colorEl.value,
-              });
+              if (cat) {
+                await categoryService.updateCategory(cat.id, payload);
+              } else {
+                await categoryService.createCategory(payload);
+              }
               modal.close();
-              toast(t('profile.categoryCreated'));
+              toast(cat ? t('profile.categoryUpdated') : t('profile.categoryCreated'));
               this.render();
             } catch (err) {
               toast(err.message || t('profile.categoryCreated'), 'error');
+            }
+            return false;
+          },
+        },
+      ],
+    });
+  }
+
+  _openAccountForm(account = null) {
+    const nameEl = input({ type: 'text', maxlength: '40', value: account?.name || '' });
+    const currencyEl = select(
+      { class: 'input' },
+      ['SATS', 'BTC', ...CURRENCIES].map((c) =>
+        option({ value: c, selected: (account?.currency || 'SATS') === c }, c)
+      )
+    );
+    const openingEl = input({
+      type: 'number',
+      class: 'input',
+      inputmode: 'decimal',
+      value: account?.openingBalance ?? '',
+      placeholder: '0',
+    });
+
+    const content = div(
+      label({ class: 'fld' }, t('tx.accountName'), nameEl),
+      label({ class: 'fld' }, t('profile.accountCurrency'), currencyEl),
+      label({ class: 'fld' }, t('tx.openingBalance'), openingEl)
+    );
+
+    modal.open({
+      title: account ? t('profile.editAccount') : t('profile.newAccount'),
+      content,
+      actions: [
+        { label: t('common.cancel'), variant: 'btn-ghost', handler: () => {} },
+        {
+          label: t('common.save'),
+          variant: 'btn-primary',
+          closeOnClick: false,
+          handler: async () => {
+            const name = nameEl.value.trim();
+            if (!name) {
+              toast(t('tx.accountName'), 'error');
+              return false;
+            }
+            const payload = {
+              name,
+              currency: currencyEl.value,
+              openingBalance: parseFloat(openingEl.value) || 0,
+            };
+            try {
+              if (account) await ledgerService.updateAccount(account.id, payload);
+              else await ledgerService.createAccount(payload);
+              modal.close();
+              toast(account ? t('profile.accountUpdated') : t('profile.accountCreated'));
+              this.render();
+            } catch (err) {
+              toast(err.message || t('profile.accountCreated'), 'error');
+            }
+            return false;
+          },
+        },
+      ],
+    });
+  }
+
+  _openAssetForm(asset = null) {
+    const nameEl = input({ type: 'text', maxlength: '40', value: asset?.name || '' });
+    const subtypeEl = select(
+      { class: 'input' },
+      ASSET_SUBTYPES.map((s) =>
+        option({ value: s, selected: (asset?.subtype || 'crypto') === s }, t('assetSubtype.' + s))
+      )
+    );
+    const symbolEl = input({
+      type: 'text',
+      maxlength: '12',
+      class: 'input',
+      placeholder: 'BTC',
+      value: asset?.symbol || '',
+    });
+
+    const content = div(
+      label({ class: 'fld' }, t('tx.assetName'), nameEl),
+      label({ class: 'fld' }, t('profile.assetType'), subtypeEl),
+      label({ class: 'fld' }, t('profile.assetSymbol'), symbolEl)
+    );
+
+    modal.open({
+      title: asset ? t('profile.editAsset') : t('profile.newAsset'),
+      content,
+      actions: [
+        { label: t('common.cancel'), variant: 'btn-ghost', handler: () => {} },
+        {
+          label: t('common.save'),
+          variant: 'btn-primary',
+          closeOnClick: false,
+          handler: async () => {
+            const name = nameEl.value.trim();
+            if (!name) {
+              toast(t('tx.assetName'), 'error');
+              return false;
+            }
+            const payload = { name, subtype: subtypeEl.value, symbol: symbolEl.value };
+            try {
+              if (asset) await ledgerService.updateAsset(asset.id, payload);
+              else await ledgerService.createAsset(payload);
+              modal.close();
+              toast(asset ? t('profile.assetUpdated') : t('profile.assetCreated'));
+              this.render();
+            } catch (err) {
+              toast(err.message || t('profile.assetCreated'), 'error');
             }
             return false;
           },
@@ -828,8 +1079,17 @@ export class ProfilePage extends Component {
         }
       } else if (action === 'change-pin') {
         lock.show('setup', { cancelable: true });
+      } else if (action === 'sub-open') {
+        this._sub = el.dataset.sub;
+        this.render();
+      } else if (action === 'sub-back') {
+        this._sub = null;
+        this.render();
       } else if (action === 'add-category') {
-        this._openAddCategory();
+        this._openCategoryForm();
+      } else if (action === 'edit-category') {
+        const cat = categoryService.getCategory(el.dataset.id);
+        if (cat?.isCustom) this._openCategoryForm(cat);
       } else if (action === 'delete-category') {
         const cat = categoryService.getCategory(el.dataset.id);
         if (!cat) return;
@@ -846,6 +1106,50 @@ export class ProfilePage extends Component {
           this.render();
         } catch (err) {
           toast(err.message || t('profile.categoryDeleted'), 'error');
+        }
+      } else if (action === 'add-account') {
+        this._openAccountForm();
+      } else if (action === 'edit-account') {
+        const account = ledgerService.getAccount(el.dataset.id);
+        if (account) this._openAccountForm(account);
+      } else if (action === 'delete-account') {
+        const account = ledgerService.getAccount(el.dataset.id);
+        if (!account) return;
+        const ok = await modal.confirm({
+          title: t('profile.deleteAccountTitle'),
+          message: t('profile.deleteAccountMessage'),
+          confirmText: t('common.delete'),
+          danger: true,
+        });
+        if (!ok) return;
+        try {
+          await ledgerService.deleteAccount(account.id);
+          toast(t('profile.accountDeleted'));
+          this.render();
+        } catch (err) {
+          toast(err.message || t('profile.accountDeleted'), 'error');
+        }
+      } else if (action === 'add-asset') {
+        this._openAssetForm();
+      } else if (action === 'edit-asset') {
+        const asset = ledgerService.getAsset(el.dataset.id);
+        if (asset) this._openAssetForm(asset);
+      } else if (action === 'delete-asset') {
+        const asset = ledgerService.getAsset(el.dataset.id);
+        if (!asset) return;
+        const ok = await modal.confirm({
+          title: t('profile.deleteAssetTitle'),
+          message: t('profile.deleteAssetMessage'),
+          confirmText: t('common.delete'),
+          danger: true,
+        });
+        if (!ok) return;
+        try {
+          await ledgerService.deleteAsset(asset.id);
+          toast(t('profile.assetDeleted'));
+          this.render();
+        } catch (err) {
+          toast(err.message || t('profile.assetDeleted'), 'error');
         }
       } else if (action === 'export') {
         this._exportData();

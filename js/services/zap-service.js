@@ -333,15 +333,18 @@ class ZapService {
             const accountId = transactionData.fromAccountId || transactionData.toAccountId;
             unit = accountId ? ledgerService.getAccount(accountId)?.currency || null : null;
         }
-        if (unit) {
-            transaction.unit = unit;
-            transaction.currency = unit;
-        }
+        if (unit) transaction.unit = unit;
 
-        // Optional fiat snapshot (currency + amount at time of entry) for legacy
-        // sats records. Native-unit records use `unit` instead.
+        // Snapshots taken at entry so a record always carries both sides and
+        // never needs a live rate to display later:
+        //   satsAmount — the sats value of `amount`
+        //   fiatAmount + currency — the fiat value of `amount`
+        const satsAmount = parseFloat(transactionData.satsAmount);
+        if (Number.isFinite(satsAmount) && satsAmount > 0) {
+            transaction.satsAmount = Math.round(satsAmount);
+        }
         const fiatAmount = parseFloat(transactionData.fiatAmount);
-        if (!unit && Number.isFinite(fiatAmount) && transactionData.currency) {
+        if (Number.isFinite(fiatAmount) && transactionData.currency) {
             transaction.fiatAmount = fiatAmount;
             transaction.currency = String(transactionData.currency).toUpperCase();
         }
@@ -574,23 +577,35 @@ class ZapService {
         }
 
         switch (transaction.type) {
-            case 'transfer':
+            case 'transfer': {
                 if (!transaction.fromAccountId || !transaction.toAccountId) {
                     throw new Error('Transfer needs a source and destination account');
                 }
                 if (transaction.fromAccountId === transaction.toAccountId) {
                     throw new Error('Transfer accounts must be different');
                 }
+                // Cross-currency transfers need an explicit conversion, which
+                // this release does not support.
+                const from = ledgerService.getAccount(transaction.fromAccountId);
+                const to = ledgerService.getAccount(transaction.toAccountId);
+                const fromCur = String(from?.currency || 'SATS').toUpperCase();
+                const toCur = String(to?.currency || 'SATS').toUpperCase();
+                if (from && to && fromCur !== toCur) {
+                    throw new Error('Transfer accounts must use the same currency');
+                }
                 break;
+            }
 
             case 'investment':
                 if (!transaction.fromAccountId) throw new Error('Investment needs a cash account');
                 if (!transaction.assetId) throw new Error('Investment needs an asset');
+                this._assertAccountCurrency(transaction, transaction.fromAccountId);
                 break;
 
             case 'investment_return': {
                 if (!transaction.toAccountId) throw new Error('Return needs a cash account');
                 if (!transaction.assetId) throw new Error('Return needs an asset');
+                this._assertAccountCurrency(transaction, transaction.toAccountId);
                 const qty = Number(transaction.assetQuantity) || 0;
                 if (qty > 0) {
                     // Exclude this record so edits can re-save with the same quantity.
@@ -618,6 +633,21 @@ class ZapService {
                     throw new Error(`Category ${category.name} cannot be used for ${transaction.type} transactions`);
                 }
             }
+        }
+    }
+
+    /**
+     * An account-linked movement must be denominated in that account's currency.
+     * @private
+     */
+    _assertAccountCurrency(transaction, accountId) {
+        if (!transaction.unit) return;
+        const account = ledgerService.getAccount(accountId);
+        if (!account) return;
+        const unit = String(transaction.unit).toUpperCase();
+        const currency = String(account.currency || 'SATS').toUpperCase();
+        if (unit !== currency) {
+            throw new Error('Amount must be in the account currency');
         }
     }
 

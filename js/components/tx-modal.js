@@ -76,15 +76,27 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
     if (mode === 'return') return accountById(toState.val);
     return accountById(fromState.val);
   };
+  /**
+   * Fiat/native label offered by the amount toggle for operating entries.
+   * Follows the primary cash account's currency, falling back to the app's
+   * display currency. Null when only sats is available.
+   */
+  const operatingFiat = () => {
+    const account = accountById(fromState.val);
+    const cur =
+      account && account.currency !== 'SATS' ? account.currency : fallbackCurrency;
+    return cur && cur !== 'SATS' ? cur : null;
+  };
+
   /** Native unit of the amount for the active mode (null = legacy sats). */
   const activeUnit = () => {
     const mode = modeState.val;
     if (isOperating(mode)) {
       // Never rewrite a historical record's unit: edits keep their own unit.
       if (tx) return tx.unit && tx.unit !== 'SATS' ? tx.unit : null;
-      // New operating entries follow the primary account's currency.
-      const account = accountById(fromState.val);
-      return account && account.currency !== 'SATS' ? account.currency : null;
+      // The sats/fiat toggle picks the storage unit for new entries.
+      const label = operatingFiat();
+      return unitState.val === 'fiat' && label ? label : null;
     }
     const account = activeAccount();
     return account ? account.currency : null;
@@ -156,11 +168,16 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
   }
 
   const setUnit = (next) => {
-    if (!fiatOn || next === unitState.val) return;
+    if (next === unitState.val) return;
     const v = rawAmount();
-    if (v > 0) {
-      amtInput.value =
-        next === 'fiat' ? priceService.satsToFiat(v).toFixed(2) : priceService.fiatToSats(v);
+    if (v > 0 && fiatOn) {
+      if (next === 'fiat') {
+        const f = priceService.satsToFiat(v);
+        if (Number.isFinite(f)) amtInput.value = f.toFixed(2);
+      } else {
+        const s = priceService.fiatToSats(v);
+        if (s > 0) amtInput.value = s;
+      }
     }
     unitState.val = next;
     entryPrefs.setUnit(next);
@@ -354,39 +371,47 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
   // ---- Unit toggle ----------------------------------------------------------
 
   const unitEl = span();
-  van.derive(() => {
-    const unit = activeUnit();
-    unitEl.replaceChildren();
-    if (unit) {
-      unitEl.appendChild(span({ class: 'unit-native' }, unit));
-      return;
-    }
-    if (!fiatOn) {
-      unitEl.appendChild(span(t('common.sats')));
-      return;
-    }
-    unitEl.appendChild(
-      button(
-        {
-          type: 'button',
-          class: 'unit-toggle',
-          id: 'txUnit',
-          'aria-label': t('tx.switchUnit'),
-          onclick: (e) => {
-            const s = e.target.closest('span[data-unit]');
-            setUnit(s ? s.dataset.unit : unitState.val === 'sats' ? 'fiat' : 'sats');
-          },
+  const unitToggle = (fiatLabel) =>
+    button(
+      {
+        type: 'button',
+        class: 'unit-toggle',
+        id: 'txUnit',
+        'aria-label': t('tx.switchUnit'),
+        onclick: (e) => {
+          const s = e.target.closest('span[data-unit]');
+          setUnit(s ? s.dataset.unit : unitState.val === 'sats' ? 'fiat' : 'sats');
         },
-        span(
-          { 'data-unit': 'sats', class: () => (unitState.val === 'sats' ? 'on' : '') },
-          t('common.sats')
-        ),
-        span(
-          { 'data-unit': 'fiat', class: () => (unitState.val === 'fiat' ? 'on' : '') },
-          fallbackCurrency
-        )
+      },
+      span(
+        { 'data-unit': 'sats', class: () => (unitState.val === 'sats' ? 'on' : '') },
+        t('common.sats')
+      ),
+      span(
+        { 'data-unit': 'fiat', class: () => (unitState.val === 'fiat' ? 'on' : '') },
+        fiatLabel
       )
     );
+
+  van.derive(() => {
+    unitEl.replaceChildren();
+    if (!isOperating(modeState.val)) {
+      const unit = activeUnit();
+      if (unit) {
+        unitEl.appendChild(span({ class: 'unit-native' }, unit));
+        return;
+      }
+      if (!fiatOn) {
+        unitEl.appendChild(span(t('common.sats')));
+        return;
+      }
+      unitEl.appendChild(unitToggle(fallbackCurrency));
+      return;
+    }
+
+    // Income/expense always offers the sats ⇄ currency switch.
+    const label = operatingFiat();
+    unitEl.appendChild(label ? unitToggle(label) : span(t('common.sats')));
   });
 
   const content = div(
@@ -451,19 +476,44 @@ export function openTxModal({ tx = null, dir = 'out', onSaved = null } = {}) {
         payload.toAccountId = toState.val;
       }
 
+      let assetQty = 0;
       if (assetModes(mode)) {
-        const qty = parseFloat(qtyInput.value);
-        if (Number.isFinite(qty) && qty > 0) payload.assetQuantity = qty;
+        assetQty = parseFloat(qtyInput.value) || 0;
+        if (assetQty > 0) payload.assetQuantity = assetQty;
       }
 
-      // Snapshot the fiat value at entry for legacy sats records only.
-      if (isOperating(mode) && !unit && fiatOn) {
-        const v = rawAmount();
-        const fiatAmount = unitState.val === 'fiat' && v > 0 ? v : priceService.satsToFiat(value);
-        if (Number.isFinite(fiatAmount)) {
-          payload.fiatAmount = fiatAmount;
-          payload.currency = fallbackCurrency;
+      // Snapshot both sides at entry so the record keeps sats AND fiat and
+      // never needs a live rate to display later.
+      let sats = 0;
+      let fiatAmount = null;
+      let fiatCurrency = fallbackCurrency;
+
+      if (unit && unit !== 'SATS') {
+        // Amount is in a native unit.
+        if (unit === 'BTC') {
+          sats = value * 1e8;
+          fiatAmount = priceService.satsToFiat(sats);
+        } else {
+          sats = priceService.fiatToSats(value, unit);
+          fiatAmount = value;
+          fiatCurrency = unit;
         }
+      } else {
+        // Amount is in sats.
+        sats = value;
+        fiatAmount = priceService.satsToFiat(value);
+      }
+
+      // A recorded bitcoin quantity is the exact sats acquired — better than a
+      // cash→sats rate conversion for investment/return entries.
+      const assetRec = assetsState.val.find((a) => a.id === assetState.val);
+      const isBitcoin = assetRec?.subtype === 'bitcoin' || assetRec?.symbol === 'BTC';
+      if (assetModes(mode) && isBitcoin && assetQty > 0) sats = assetQty * 1e8;
+
+      if (Number.isFinite(sats) && sats > 0) payload.satsAmount = Math.round(sats);
+      if (Number.isFinite(fiatAmount) && fiatAmount > 0) {
+        payload.fiatAmount = fiatAmount;
+        payload.currency = fiatCurrency;
       }
 
       try {

@@ -95,6 +95,7 @@ export default {
     invested: 'ລົງທຶນ',
     returnedPrincipal: 'ທຶນທີ່ຄືນມາ',
     netCashFlow: 'ກະແສເງິນສຸດທິ',
+    alsoHeld: 'ຖືຢູ່ນອກຈາກນັ້ນ:',
     howWasToday: 'ມື້ນີ້ເປັນແນວໃດແດ່?',
     journalWaiting: 'ວາລະສານຂອງທ່ານກຳລັງລໍຖ້າ. ເລືອກອາລົມເພື່ອເລີ່ມ.',
     budgetsThisMonth: 'ງົບປະມານ · ເດືອນນີ້',

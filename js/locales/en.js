@@ -98,6 +98,7 @@ export default {
     invested: 'Invested',
     returnedPrincipal: 'Returned principal',
     netCashFlow: 'Net cash flow',
+    alsoHeld: 'Also held:',
     howWasToday: 'How was today?',
     journalWaiting: 'Your journal is waiting. Pick a mood to begin.',
     budgetsThisMonth: 'Budgets · this month',

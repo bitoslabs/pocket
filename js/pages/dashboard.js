@@ -33,6 +33,7 @@ import {
 import { txRow } from '../components/tx-row.js';
 import { openComposer } from '../components/journal-composer.js';
 import { openTxModal } from '../components/tx-modal.js';
+import { balancesByCurrency } from '../utils/ledger.js';
 import van from '../vendor/van.js';
 
 const { b, button, div, h3, i, p, small, span } = van.tags;
@@ -57,6 +58,12 @@ export class HomePage extends Component {
     const totals = monthTotals(transactions, now.getFullYear(), now.getMonth());
     const accounts = store.get('accounts') || [];
     const balance = accounts.length ? cashBalance(transactions, accounts) : allTimeBalance(transactions);
+    const primaryCurrency = accounts.length ? accounts[0].currency || 'SATS' : 'SATS';
+    const otherBalances = accounts.length
+      ? Object.entries(balancesByCurrency(transactions, accounts)).filter(
+          ([cur, v]) => cur !== primaryCurrency && Math.abs(v) > 1e-9
+        )
+      : [];
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -93,7 +100,7 @@ export class HomePage extends Component {
       div({ class: 'hi-sub' }, `${dateStr} · ${t('dashboard.privateCorner')}`),
       showLocalNotice ? this._localNotice() : null,
       authenticated ? null : this._connectCard(),
-      this._balanceBlock(balance, totals, accounts),
+      this._balanceBlock(balance, totals, accounts, otherBalances),
       this._todayCard(todayEntry),
       topBudgets.length ? this._budgetsCard(topBudgets) : null,
       this._recentCard(recent, linkedIds)
@@ -134,7 +141,7 @@ export class HomePage extends Component {
     );
   }
 
-  _balanceBlock(balance, totals, accounts = []) {
+  _balanceBlock(balance, totals, accounts = [], otherBalances = []) {
     const { tin, tout, invested, returned, netCashFlow } = totals;
     const unit = accounts.length ? accounts[0].currency || 'SATS' : 'SATS';
     const isSats = unit === 'SATS';
@@ -143,6 +150,13 @@ export class HomePage extends Component {
       { class: 'balance' },
       div({ class: 'bal-label' }, t('dashboard.cashBalance')),
       div({ class: 'bal-num' }, fmtFull(balance), small(isSats ? t('common.sats') : unit)),
+      otherBalances.length
+        ? div(
+            { class: 'bal-note' },
+            `${t('dashboard.alsoHeld')} `,
+            otherBalances.map(([cur, v]) => `${fmtFull(v)} ${cur}`).join(' · ')
+          )
+        : null,
       conv ? div({ class: 'bal-conv' }, `${fmtFull(balance)} ${t('common.sats')} ~ ${conv}`) : null,
       isSats ? div({ class: 'bal-btc' }, toBTC(balance)) : null,
       div(

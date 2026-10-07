@@ -95,6 +95,7 @@ export default {
     invested: 'ลงทุน',
     returnedPrincipal: 'เงินต้นที่คืน',
     netCashFlow: 'กระแสเงินสดสุทธิ',
+    alsoHeld: 'ถือเพิ่มเติม:',
     howWasToday: 'วันนี้เป็นอย่างไรบ้าง?',
     journalWaiting: 'ไดอารี่ของคุณรออยู่ เลือกอารมณ์เพื่อเริ่มต้น',
     budgetsThisMonth: 'งบประมาณ · เดือนนี้',

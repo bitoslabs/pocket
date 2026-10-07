@@ -6,6 +6,7 @@ import {
   assetHolding,
   assetPositions,
   availableQuantity,
+  balancesByCurrency,
   cashBalance,
   periodTotals,
   spentByCategory,
@@ -13,6 +14,9 @@ import {
 } from '../js/utils/ledger.js';
 import { monthTotals, spentByCat } from '../js/utils/ui.js';
 import { zapService } from '../js/services/zap-service.js';
+import { ledgerService } from '../js/services/ledger-service.js';
+import { storageService } from '../js/services/storage-service.js';
+import { outbox } from '../js/services/outbox.js';
 
 const NOW = Date.now();
 const when = () => NOW;
@@ -84,7 +88,7 @@ test('multi-account transfers move cash without changing the total', () => {
 test('acceptance example: BCEL opening, expenses and a bitcoin purchase', () => {
   const bcel = { id: 'bcel', name: 'BCEL', currency: 'LAK', openingBalance: 5000000 };
   const tx = [
-    { type: 'expense', amount: 2000000, created_at: when() },
+    { type: 'expense', amount: 2000000, unit: 'LAK', created_at: when() },
     {
       type: 'investment',
       amount: 1000000,
@@ -149,4 +153,78 @@ test('_validateManualTransaction rejects unknown types and missing links', () =>
       assetId: 'x',
     })
   );
+});
+
+test('an account never absorbs a movement in another currency', () => {
+  const lak = { id: 'lak', name: 'BCEL', currency: 'LAK', openingBalance: 1000000 };
+  const tx = [
+    { type: 'expense', amount: 300000, unit: 'LAK' }, // attributed to primary
+    { type: 'expense', amount: 500, unit: null }, // legacy sats, must be ignored
+  ];
+  assert.equal(accountBalance(tx, lak, { attributeUnassigned: true }), 700000);
+});
+
+test('cash balances are grouped by currency, never summed together', () => {
+  const accounts = [
+    { id: 'lak', currency: 'LAK', openingBalance: 1000000 },
+    { id: 'sats', currency: 'SATS', openingBalance: 100 },
+  ];
+  const tx = [
+    { type: 'expense', amount: 200000, unit: 'LAK', fromAccountId: 'lak' },
+    { type: 'expense', amount: 40, unit: 'SATS', fromAccountId: 'sats' },
+  ];
+  assert.deepEqual(balancesByCurrency(tx, accounts), { LAK: 800000, SATS: 60 });
+  // The primary (first) account's currency drives the headline balance.
+  assert.equal(cashBalance(tx, accounts), 800000);
+});
+
+test('createManualTransaction keeps both sats and fiat snapshots', async () => {
+  storageService.put = async () => true;
+  outbox.enqueue = async () => ({});
+  ledgerService._accounts = [];
+
+  const tx = await zapService.createManualTransaction({
+    type: 'investment',
+    amount: 2350000,
+    unit: 'LAK',
+    fromAccountId: 'bcel',
+    assetId: 'btc',
+    assetQuantity: 0.001,
+    satsAmount: 100000,
+    fiatAmount: 2350000,
+    currency: 'LAK',
+  });
+
+  assert.equal(tx.unit, 'LAK');
+  assert.equal(tx.satsAmount, 100000);
+  assert.equal(tx.fiatAmount, 2350000);
+  assert.equal(tx.currency, 'LAK');
+  assert.equal(tx.assetQuantity, 0.001);
+});
+
+test('a cross-currency transfer is rejected by validation', () => {
+  ledgerService._accounts = [
+    { id: 'lak', name: 'BCEL', currency: 'LAK', openingBalance: 0 },
+    { id: 'lak2', name: 'BCEL 2', currency: 'LAK', openingBalance: 0 },
+    { id: 'sats', name: 'Cash', currency: 'SATS', openingBalance: 0 },
+  ];
+  assert.throws(
+    () =>
+      zapService._validateManualTransaction({
+        type: 'transfer',
+        amount: 100,
+        fromAccountId: 'sats',
+        toAccountId: 'lak',
+      }),
+    /same currency/
+  );
+  assert.doesNotThrow(() =>
+    zapService._validateManualTransaction({
+      type: 'transfer',
+      amount: 100,
+      fromAccountId: 'lak',
+      toAccountId: 'lak2',
+    })
+  );
+  ledgerService._accounts = [];
 });

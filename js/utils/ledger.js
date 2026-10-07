@@ -96,30 +96,100 @@ export function cashDelta(tx, accountId) {
   return totalCashDelta(tx);
 }
 
-/** Total cash across all accounts: opening balances + every cash movement. */
-export function cashBalance(transactions, accounts = []) {
-  let b = (accounts || []).reduce((sum, a) => sum + (Number(a.openingBalance) || 0), 0);
-  for (const tx of transactions || []) b += totalCashDelta(tx);
-  return b;
+/** Currency of a movement: its explicit `unit`, else legacy sats. */
+export function movementCurrency(tx) {
+  const unit = tx?.unit;
+  return unit ? String(unit).toUpperCase() : 'SATS';
+}
+
+/** Currency of an account (defaults to sats for legacy records). */
+export function accountCurrency(account) {
+  return String(account?.currency || 'SATS').toUpperCase();
+}
+
+/** Find an account by id, or null. */
+export function findAccount(accounts, id) {
+  if (!id) return null;
+  return (accounts || []).find((a) => a.id === id) || null;
 }
 
 /**
- * Balance of one account. Unassigned movements (e.g. simple expenses logged
- * before accounts existed) are attributed to the primary account when
- * `attributeUnassigned` is set.
+ * Balance of one account. An account never absorbs a movement in another
+ * currency: assigned movements must match its id *and* currency; unassigned
+ * legacy movements are attributed to the primary account only when their
+ * currency matches.
  */
 export function accountBalance(transactions, account, { attributeUnassigned = false } = {}) {
   if (!account) return 0;
+  const cur = accountCurrency(account);
   let b = Number(account.openingBalance) || 0;
+
   for (const tx of transactions || []) {
+    if (tx?.type === 'transfer') {
+      if (tx.fromAccountId === account.id) b -= amountOf(tx);
+      if (tx.toAccountId === account.id) b += amountOf(tx);
+      continue;
+    }
     const assigned = tx.fromAccountId || tx.toAccountId || tx.accountId;
     if (assigned) {
-      b += cashDelta(tx, account.id);
-    } else if (attributeUnassigned) {
+      if (assigned !== account.id) continue;
+      if (movementCurrency(tx) !== cur) continue;
+      b += totalCashDelta(tx);
+    } else if (attributeUnassigned && movementCurrency(tx) === cur) {
       b += totalCashDelta(tx);
     }
   }
   return b;
+}
+
+/**
+ * Cash totals grouped by currency, combining opening balances and every
+ * movement. This is the currency-safe view of a mixed-currency ledger:
+ * amounts in different currencies are never added together.
+ *
+ * @returns {Object<string, number>} e.g. { LAK: 2000000, SATS: 500 }
+ */
+export function balancesByCurrency(transactions, accounts = []) {
+  const accountsList = accounts || [];
+  const buckets = {};
+  const add = (cur, v) => {
+    buckets[cur] = (buckets[cur] || 0) + v;
+  };
+
+  for (const account of accountsList) {
+    add(accountCurrency(account), Number(account.openingBalance) || 0);
+  }
+
+  for (const tx of transactions || []) {
+    if (tx?.type === 'transfer') {
+      const from = findAccount(accountsList, tx.fromAccountId);
+      const to = findAccount(accountsList, tx.toAccountId);
+      const fromCur = accountCurrency(from || to || {});
+      const toCur = to ? accountCurrency(to) : fromCur;
+      add(fromCur, -amountOf(tx));
+      add(toCur, amountOf(tx));
+      continue;
+    }
+    const delta = totalCashDelta(tx);
+    if (!delta) continue;
+    const assignedId = tx.fromAccountId || tx.toAccountId || tx.accountId;
+    const account = findAccount(accountsList, assignedId);
+    add(account ? accountCurrency(account) : movementCurrency(tx), delta);
+  }
+
+  return buckets;
+}
+
+/**
+ * Primary-currency cash balance. With no accounts this is the legacy
+ * single-unit total (income − expenses − invested + returns).
+ */
+export function cashBalance(transactions, accounts = []) {
+  if (!accounts || accounts.length === 0) {
+    return (transactions || []).reduce((b, t) => b + totalCashDelta(t), 0);
+  }
+  const primary = accountCurrency(accounts[0]);
+  return balancesByCurrency(transactions, accounts)[primary] || 0;
 }
 
 /**
@@ -257,7 +327,10 @@ export default {
   inMonth,
   totalCashDelta,
   cashDelta,
+  movementCurrency,
+  accountCurrency,
   cashBalance,
+  balancesByCurrency,
   accountBalance,
   periodTotals,
   spentByCategory,

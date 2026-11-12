@@ -2064,6 +2064,38 @@
 .divider {
   color: var(--muted);
 }
+.login-ic {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--accent-2);
+}
+.login-ic svg {
+  width: 21px;
+  height: 21px;
+}
+.login-chevron {
+  color: var(--muted);
+}
+.login-chevron svg {
+  width: 16px;
+  height: 16px;
+}
+.login-qr {
+  display: block;
+  width: 200px;
+  height: 200px;
+  padding: 10px;
+  border-radius: 16px;
+  background: #fff;
+}
+.login-uri {
+  word-break: break-all;
+  max-height: 72px;
+  overflow: auto;
+}
 .join {
   display: flex;
   gap: var(--space-2);

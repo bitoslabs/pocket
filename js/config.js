@@ -51,6 +51,7 @@ export const config = {
     storage: {
         keys: {
             USER: 'nostr_user',
+            NIP46: 'nip46_connection',
             RELAYS: 'nostr_relays',
             THEME: 'app_theme',
             LANG: 'app_lang',

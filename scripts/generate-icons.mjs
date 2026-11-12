@@ -408,20 +408,9 @@ function encodePng(size, rgba) {
 
 mkdirSync(iconsDir, { recursive: true });
 
-// The compact UI mark keeps its own simplified geometry/colours and is written
-// alongside the raster icons so `npm run icons` reproduces the whole set.
-const MARK_COLORS = { background: '#1B1330', page: '#A78BFA', bolt: '#FFC24B' };
-const MARK_SHAPES = [
-  { color: 'page', points: [[17, 30], [30, 26], [44, 30], [44, 70], [30, 66], [17, 69]] },
-  { color: 'page', points: [[56, 30], [70, 26], [83, 30], [83, 69], [70, 66], [56, 70]] },
-  { color: 'bolt', points: [[57, 14], [41, 49], [52, 49], [45, 86], [68, 43], [55, 43], [63, 14]] },
-];
-const markSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="title">
-  <title id="title">PocketZap: an open journal and lightning bolt</title>
-  <rect width="100" height="100" rx="22" fill="${MARK_COLORS.background}"/>
-${MARK_SHAPES.map(({ color, points }) => `  <polygon points="${points.map((point) => point.join(',')).join(' ')}" fill="${MARK_COLORS[color]}"/>`).join('\n')}
-</svg>\n`;
-writeFileSync(join(iconsDir, 'logo-mark.svg'), markSvg);
+// The compact UI mark reproduces the logo with squircle container
+const logoSvgContent = readFileSync(join(iconsDir, 'logo.svg'), 'utf8');
+writeFileSync(join(iconsDir, 'logo-mark.svg'), logoSvgContent);
 console.log(`wrote ${join(iconsDir, 'logo-mark.svg')}`);
 
 const logo = parseSvg(readFileSync(logoFile, 'utf8'));

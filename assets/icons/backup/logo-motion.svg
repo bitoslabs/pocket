@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="logoMotionTitle">
+  <title id="logoMotionTitle">PocketZap</title>
+  <defs>
+    <style>
+      .logo-wing-l,
+      .logo-wing-r,
+      .logo-bolt {
+        transform-box: fill-box;
+        transform-origin: center;
+        will-change: transform, opacity;
+      }
+
+      .logo-wing-l,
+      .logo-wing-r {
+        fill: #a487f5;
+      }
+
+      .logo-wing-l {
+        animation: logoWingL 620ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 240ms both;
+      }
+
+      .logo-wing-r {
+        animation: logoWingR 620ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 240ms both;
+      }
+
+      .logo-bolt {
+        fill: #eec142;
+        animation: logoBoltIn 560ms cubic-bezier(0.2, 0.9, 0.3, 1.4) 560ms both,
+          logoBoltPulse 2.4s ease-in-out 1.5s infinite;
+      }
+
+      @keyframes logoWingL {
+        from {
+          opacity: 0;
+          transform: translateX(-96px) scale(0.92);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0) scale(1);
+        }
+      }
+
+      @keyframes logoWingR {
+        from {
+          opacity: 0;
+          transform: translateX(96px) scale(0.92);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0) scale(1);
+        }
+      }
+
+      @keyframes logoBoltIn {
+        0% {
+          opacity: 0;
+          transform: scale(0.2) rotate(-20deg);
+        }
+        70% {
+          opacity: 1;
+          transform: scale(1.12) rotate(4deg);
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1) rotate(0deg);
+        }
+      }
+
+      @keyframes logoBoltPulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.07);
+          filter: drop-shadow(0 0 26px rgba(238, 193, 66, 0.65));
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .logo-wing-l,
+        .logo-wing-r,
+        .logo-bolt {
+          animation: none;
+        }
+      }
+    </style>
+  </defs>
+  <g>
+    <path class="logo-wing-r" d="M594.87,267.32l-23.42,151.7,138.37.14-154.73,318.25c18.46-10.61,36.49-16.3,57.05-16.38l240.79-.19v-454.63s-237.73-.03-237.73-.03l-20.33,1.14Z"/>
+    <path class="logo-wing-l" d="M355.69,566.75l131.93-272.93c-7.01-8.98-16.76-14.9-27.01-19.41-13.29-5.92-26.84-8.29-41.79-8.29l-247.76.08.07,454.67,235.71.04c18.9,0,36.16,3.38,53.39,11.81l27.85-165.57-132.38-.39Z"/>
+    <path class="logo-bolt" d="M604.67,577.77c1.3-2.68,1.69-5.29,3.2-7.84l3.41-5.75,50.17-102.67c1.4-2.86,2.82-4.95,2.8-8.29,2.93-2.29,4.58-5.48,4.87-9.21l-126.31-.02,33.32-216.43,3.61-22.6,7.54-48.48,1.52-15.67-56.15,116.9-79.68,165.26-57.66,119.15,121.96.07-21.09,123.54c-1.86,3.72-2.55,7.05-2.09,11.09l-3.19,14.02-.86,9.39-29.07,171.39,28.67-57.96,38.77-79.33,54.19-111.03,22.07-45.53Z"/>
+  </g>
+</svg>

@@ -9,6 +9,7 @@ import { config } from '../config.js';
 import { eventBus, Events } from '../core/event-bus.js';
 import { store } from '../core/state.js';
 import { storageService } from './storage-service.js';
+import { nip46Service } from './nip46-service.js';
 
 class AuthService {
     constructor() {
@@ -26,6 +27,17 @@ class AuthService {
         // Restore session from storage
         const savedUser = storageService.getLocal(config.storage.keys.USER);
         if (savedUser && savedUser.pubkey) {
+            if (savedUser.method === 'nip46') {
+                const restored = nip46Service.restoreFromStorage();
+                if (!restored || restored.userPubkey !== savedUser.pubkey) {
+                    nip46Service.clearStoredConnection();
+                    storageService.removeLocal(config.storage.keys.USER);
+                    return this._nip07Available;
+                }
+            } else {
+                nip46Service.clearStoredConnection();
+            }
+
             this._pubkey = savedUser.pubkey;
             store.set('user', savedUser);
             store.set('isAuthenticated', true);
@@ -81,6 +93,31 @@ class AuthService {
      */
     getPublicKey() {
         return this._pubkey;
+    }
+
+    /**
+     * Save an authenticated session and notify the app.
+     * @private
+     */
+    _persistUser(pubkey, method) {
+        if (method === 'nip46') {
+            storageService.removeLocal('auth_privkey');
+        }
+
+        const user = {
+            pubkey,
+            npub: this._pubkeyToNpub(pubkey),
+            loggedInAt: Date.now(),
+            method,
+        };
+
+        storageService.setLocal(config.storage.keys.USER, user);
+        store.set('user', user);
+        store.set('isAuthenticated', true);
+        store.set('isLoading', false);
+
+        eventBus.emit(Events.AUTH_LOGIN, user);
+        return user;
     }
 
     /**
@@ -158,23 +195,11 @@ class AuthService {
                 throw new Error('Login failed: Invalid public key format received.');
             }
 
+            await nip46Service.disconnect({ logout: true });
+            storageService.removeLocal('auth_privkey');
+
             this._pubkey = pubkey;
-
-            // Create user object
-            const user = {
-                pubkey,
-                npub: this._pubkeyToNpub(pubkey),
-                loggedInAt: Date.now(),
-                method: 'nip07'
-            };
-
-            // Save to storage and state
-            storageService.setLocal(config.storage.keys.USER, user);
-            store.set('user', user);
-            store.set('isAuthenticated', true);
-            store.set('isLoading', false);
-
-            eventBus.emit(Events.AUTH_LOGIN, user);
+            const user = this._persistUser(pubkey, 'nip07');
             console.log('[Auth] Login successful (NIP-07):', user.npub);
 
             return user;
@@ -220,26 +245,15 @@ class AuthService {
             const pubkey = window.NostrTools.getPublicKey(privkey);
             this._pubkey = pubkey;
 
+            await nip46Service.disconnect({ logout: true });
+
             // Store private key securely (in memory mostly, but persistent for this demo app)
             // Use sessionStorage for slightly better security than localStorage if preferred, 
             // but for a persistent "app" feel we often need localStorage.
             // WARNING: Storing keys in localStorage is not recommended for high-value accounts.
             storageService.setLocal('auth_privkey', privkey);
 
-            const user = {
-                pubkey,
-                npub: this._pubkeyToNpub(pubkey),
-                loggedInAt: Date.now(),
-                method: 'secret'
-            };
-
-            // Save public session
-            storageService.setLocal(config.storage.keys.USER, user);
-            store.set('user', user);
-            store.set('isAuthenticated', true);
-            store.set('isLoading', false);
-
-            eventBus.emit(Events.AUTH_LOGIN, user);
+            const user = this._persistUser(pubkey, 'secret');
             console.log('[Auth] Login successful (Secret):', user.npub);
 
             return user;
@@ -248,6 +262,65 @@ class AuthService {
             store.set('isLoading', false);
             store.set('error', error.message);
             eventBus.emit(Events.AUTH_ERROR, { message: error.message });
+            throw error;
+        }
+    }
+
+    /**
+     * Login with a NIP-46 remote signer (bunker URL or NIP-05 address).
+     * @param {string} input - bunker:// URL or NIP-05 identifier
+     * @param {Object} [options]
+     * @param {Function} [options.onAuth] - Called when the signer needs approval
+     * @returns {Promise<Object>} User object
+     */
+    async loginWithBunker(input, options = {}) {
+        try {
+            store.set('isLoading', true);
+            const { userPubkey } = await nip46Service.connectBunker(input, options);
+            this._pubkey = userPubkey;
+            const user = this._persistUser(userPubkey, 'nip46');
+            console.log('[Auth] Login successful (NIP-46):', user.npub);
+            return user;
+        } catch (error) {
+            store.set('isLoading', false);
+            store.set('error', error.message);
+            eventBus.emit(Events.AUTH_ERROR, { message: error.message });
+            throw error;
+        }
+    }
+
+    /**
+     * Login by showing a `nostrconnect://` QR code to a signer app.
+     * @param {Object} options
+     * @param {Function} options.onUri - Receives the connection URI to render
+     * @param {Array<string>} [options.relays] - Relays used for the handshake
+     * @param {AbortSignal} [options.signal] - Cancels the pending connection
+     * @param {Function} [options.onAuth] - Called when the signer needs approval
+     * @returns {Promise<Object>} User object
+     */
+    async loginWithNostrConnect(options = {}) {
+        try {
+            store.set('isLoading', true);
+            const savedRelays = storageService.getLocal(config.storage.keys.RELAYS);
+            const relays =
+                options.relays ||
+                (Array.isArray(savedRelays) && savedRelays.length > 0
+                    ? savedRelays
+                    : config.relays.default);
+            const { userPubkey } = await nip46Service.connectNostrConnect({
+                ...options,
+                relays,
+            });
+            this._pubkey = userPubkey;
+            const user = this._persistUser(userPubkey, 'nip46');
+            console.log('[Auth] Login successful (NIP-46 QR):', user.npub);
+            return user;
+        } catch (error) {
+            store.set('isLoading', false);
+            if (error.name !== 'AbortError') {
+                store.set('error', error.message);
+                eventBus.emit(Events.AUTH_ERROR, { message: error.message });
+            }
             throw error;
         }
     }
@@ -289,6 +362,8 @@ class AuthService {
     logout() {
         this._pubkey = null;
 
+        void nip46Service.disconnect({ logout: true });
+
         // Clear private key if it exists
         storageService.removeLocal('auth_privkey');
 
@@ -306,6 +381,10 @@ class AuthService {
      * @returns {Promise<Object>} Signed event
      */
     async signEvent(event) {
+        if (nip46Service.isConnected()) {
+            return nip46Service.signEvent(event);
+        }
+
         // Check for local private key first
         const localPrivKey = storageService.getLocal('auth_privkey');
 
@@ -345,6 +424,10 @@ class AuthService {
      * @returns {Promise<string>} Encrypted message
      */
     async encrypt(pubkey, plaintext) {
+        if (nip46Service.isConnected()) {
+            return nip46Service.nip04Encrypt(pubkey, plaintext);
+        }
+
         // Check for local private key first
         const localPrivKey = storageService.getLocal('auth_privkey');
 
@@ -376,6 +459,10 @@ class AuthService {
      * @returns {Promise<string>} Decrypted message
      */
     async decrypt(pubkey, ciphertext) {
+        if (nip46Service.isConnected()) {
+            return nip46Service.nip04Decrypt(pubkey, ciphertext);
+        }
+
         // Check for local private key first
         const localPrivKey = storageService.getLocal('auth_privkey');
 
